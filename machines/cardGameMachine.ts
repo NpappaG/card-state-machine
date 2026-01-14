@@ -374,10 +374,16 @@ export const cardGameMachine = setup({
                   target: '#cardGame.roundEnd',
                 },
                 {
-                  target: 'checkingCards',
-                  actions: 'advanceTurn',
+                  target: 'changingTurn',
                 },
               ],
+            },
+
+            changingTurn: {
+              entry: 'advanceTurn',
+              after: {
+                500: 'checkingCards', // 500ms delay for animation
+              },
             },
           },
         },
