@@ -43,6 +43,5 @@ export type GameEvent =
   | { type: 'DESELECT_CARD'; cardId: string }
   | { type: 'PLAY_SELECTED' }
   | { type: 'TIMER_TICK' }
-  | { type: 'TIMER_EXPIRE' }
   | { type: 'NEW_ROUND' }
   | { type: 'GAME_OVER' };

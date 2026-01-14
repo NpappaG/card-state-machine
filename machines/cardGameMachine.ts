@@ -309,9 +309,10 @@ export const cardGameMachine = setup({
         TIMER_TICK: {
           actions: 'updateTimer',
         },
-        TIMER_EXPIRE: {
-          target: 'roundEnd',
-        },
+      },
+      always: {
+        guard: 'timerExpired',
+        target: 'roundEnd',
       },
       initial: 'playerTurn',
       states: {
@@ -367,10 +368,6 @@ export const cardGameMachine = setup({
               always: [
                 {
                   guard: 'currentPlayerHasNoCards',
-                  target: '#cardGame.roundEnd',
-                },
-                {
-                  guard: 'timerExpired',
                   target: '#cardGame.roundEnd',
                 },
                 {
