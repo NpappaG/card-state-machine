@@ -33,9 +33,9 @@ Multiple Card Selection: When multiple valid cards are available:
 - Click cards to select/deselect them
 - SPACE key to play all selected cards as together
 
-### Pseudocode
+### Requirements
 
-Alternatively use the following format propose state machine schema to model the card game, provide commentary on overarching design if there is more than one state machine.
+Use XState to handle state - see docs/XSTATE_DOCS.md for more
 
 StateMachine
 │
