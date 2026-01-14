@@ -18,6 +18,21 @@ Achieve the lowest total hand value or dispose of all your cards before the 3-mi
 - Queen = 12 points
 - King = 13 points
 
+### Deck
+
+Standard 52-card deck:
+- **Suits**: Hearts, Diamonds, Clubs, Spades (4 suits)
+- **Ranks**: Ace, 2, 3, 4, 5, 6, 7, 8, 9, 10, Jack, Queen, King (13 ranks per suit)
+- **Total Cards**: 52 cards
+
+### Game Setup
+
+- **Players**: 2-8 players
+- **Initial Deal**: Each player receives 3 cards
+- **Starting Card**: One card is dealt face-up to start the discard pile
+- **First Player**: Randomly selected at the start of each game
+- **Timer**: 3-minute timer starts when the starting card is revealed
+
 ### Turn-based Play
 
 Players alternate placing cards on shared discard pile. You can only play cards that:
