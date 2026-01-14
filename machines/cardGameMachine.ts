@@ -158,16 +158,17 @@ export const cardGameMachine = setup({
       };
     }),
 
-    playSingleCard: assign(({ context, event }) => {
-      if (event.type !== 'PLAY_CARD') return context;
-
+    autoPlaySingleCard: assign(({ context }) => {
       const currentPlayer = context.players[context.currentPlayerIndex];
-      const card = currentPlayer.hand.find((c) => c.id === event.cardId);
+      const topCard = context.discardPile[context.discardPile.length - 1];
 
-      if (!card) return context;
+      // Find the single valid card
+      const validCard = currentPlayer.hand.find((card) => card.rank === topCard.rank);
+
+      if (!validCard) return context;
 
       // Remove card from hand and add to discard pile
-      const newHand = currentPlayer.hand.filter((c) => c.id !== event.cardId);
+      const newHand = currentPlayer.hand.filter((c) => c.id !== validCard.id);
 
       const updatedPlayers = context.players.map((player, idx) =>
         idx === context.currentPlayerIndex ? { ...player, hand: newHand } : player
@@ -176,7 +177,7 @@ export const cardGameMachine = setup({
       return {
         ...context,
         players: updatedPlayers,
-        discardPile: [...context.discardPile, card],
+        discardPile: [...context.discardPile, validCard],
       };
     }),
 
@@ -233,28 +234,11 @@ export const cardGameMachine = setup({
 
   guards: {
     // Card validation guards
-    canPlayCard: ({ context, event }) => {
-      if (event.type !== 'PLAY_CARD') return false;
-
-      const currentPlayer = context.players[context.currentPlayerIndex];
-      const card = currentPlayer.hand.find((c) => c.id === event.cardId);
-      const topCard = context.discardPile[context.discardPile.length - 1];
-
-      return !!card && card.rank === topCard.rank;
-    },
-
     canPlaySelectedCards: ({ context }) => {
       if (context.selectedCards.length === 0) return false;
 
       const topCard = context.discardPile[context.discardPile.length - 1];
       return context.selectedCards.every((card) => card.rank === topCard.rank);
-    },
-
-    hasValidCards: ({ context }) => {
-      const currentPlayer = context.players[context.currentPlayerIndex];
-      const topCard = context.discardPile[context.discardPile.length - 1];
-
-      return currentPlayer.hand.some((card) => card.rank === topCard.rank);
     },
 
     hasMultipleValidCards: ({ context }) => {
@@ -263,6 +247,14 @@ export const cardGameMachine = setup({
 
       const validCards = currentPlayer.hand.filter((card) => card.rank === topCard.rank);
       return validCards.length > 1;
+    },
+
+    hasSingleValidCard: ({ context }) => {
+      const currentPlayer = context.players[context.currentPlayerIndex];
+      const topCard = context.discardPile[context.discardPile.length - 1];
+
+      const validCards = currentPlayer.hand.filter((card) => card.rank === topCard.rank);
+      return validCards.length === 1;
     },
 
     // Win condition guards
@@ -333,31 +325,19 @@ export const cardGameMachine = setup({
                   target: '#cardGame.roundEnd',
                 },
                 {
-                  guard: { type: 'hasValidCards', not: true },
-                  target: 'drawing',
-                },
-                {
                   guard: 'hasMultipleValidCards',
                   target: 'selecting',
                 },
                 {
-                  target: 'waiting',
+                  guard: 'hasSingleValidCard',
+                  target: 'evaluating',
+                  actions: 'autoPlaySingleCard',
+                },
+                {
+                  // No valid cards - must draw
+                  target: 'drawing',
                 },
               ],
-            },
-
-            waiting: {
-              on: {
-                PLAY_CARD: {
-                  guard: 'canPlayCard',
-                  target: 'evaluating',
-                  actions: 'playSingleCard',
-                },
-                SELECT_CARD: {
-                  target: 'selecting',
-                  actions: 'selectCard',
-                },
-              },
             },
 
             selecting: {

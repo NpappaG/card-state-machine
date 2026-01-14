@@ -39,16 +39,10 @@ export type GameContext = {
 // Game events
 export type GameEvent =
   | { type: 'START_GAME'; playerCount: number; playerNames?: string[] }
-  | { type: 'SETUP_COMPLETE' }
-  | { type: 'PLAY_CARD'; cardId: string }
   | { type: 'SELECT_CARD'; cardId: string }
   | { type: 'DESELECT_CARD'; cardId: string }
   | { type: 'PLAY_SELECTED' }
-  | { type: 'DRAW_CARD' }
-  | { type: 'DRAW_COMPLETE' }
-  | { type: 'NEXT_TURN' }
-  | { type: 'TIMER_TICK'; remainingMs: number }
+  | { type: 'TIMER_TICK' }
   | { type: 'TIMER_EXPIRE' }
-  | { type: 'ROUND_END' }
   | { type: 'NEW_ROUND' }
   | { type: 'GAME_OVER' };
