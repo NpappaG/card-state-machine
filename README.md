@@ -1,10 +1,15 @@
 # card-state-machine
 
-A state machine architecture for a turn based card game system.
+A state machine architecture for a turn-based card game system using XState v5.
+
+## Status
+
+✅ **State Machine Complete** - Fully implemented game logic in `machines/cardGameMachine.ts`
+🚧 **UI In Progress** - React components to be built next
 
 ## Overview
 
-You are designing the state machine architecture for a turn based card game system.
+This project implements a complete state machine for a turn-based card matching game where 2-8 players race to empty their hands or achieve the lowest score before a 3-minute timer expires.
 
 ## Game Mechanics
 
@@ -119,3 +124,30 @@ StateMachine
 └── transitionAction()
 ├── Type: TRANSITION
 └── Side Effect: Description of side effect or external impact
+
+## Tech Stack
+
+- **State Management**: XState v5 (Actor Model)
+- **Framework**: Next.js 16+ with App Router
+- **Runtime**: Bun
+- **Language**: TypeScript 5+
+- **Styling**: Tailwind CSS v4
+
+## Getting Started
+
+```bash
+# Install dependencies
+bun install
+
+# Run development server
+bun run dev
+
+# Build for production
+bun run build
+```
+
+## Documentation
+
+- `docs/CLAUDE.md` - Complete architecture guide and implementation status
+- `docs/XSTATE_DOCS.md` - XState v5 reference
+- `machines/cardGameMachine.ts` - Main game state machine implementation

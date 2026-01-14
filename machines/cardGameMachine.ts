@@ -53,7 +53,7 @@ function randomInt(max: number): number {
 // Timer actor using fromCallback
 const timerLogic = fromCallback(({ sendBack }) => {
   const interval = setInterval(() => {
-    sendBack({ type: 'TIMER_TICK' });
+    sendBack({ type: 'timer.tick' });
   }, 1000); // Tick every second
 
   return () => clearInterval(interval);
@@ -70,28 +70,32 @@ export const cardGameMachine = setup({
   actions: {
     // Setup actions
     initializeGame: assign(({ context, event }) => {
-      if (event.type !== 'START_GAME') return context;
+      if (event.type !== 'game.start') return context;
 
       const playerCount = Math.max(2, Math.min(8, event.playerCount));
-      const players: Player[] = Array.from({ length: playerCount }, (_, i) => ({
-        id: `player-${i + 1}`,
-        name: event.playerNames?.[i] || `Player ${i + 1}`,
-        hand: [],
-        score: 0,
-      }));
 
       // Create and shuffle deck
-      let deck = shuffle(createDeck());
+      const shuffledDeck = shuffle(createDeck());
 
-      // Deal 3 cards to each player
-      players.forEach((player) => {
-        player.hand = deck.slice(0, 3);
-        deck = deck.slice(3);
+      // Deal 3 cards to each player (pure - no mutation)
+      const players: Player[] = Array.from({ length: playerCount }, (_, i) => {
+        const startIdx = i * 3;
+        return {
+          id: `player-${i + 1}`,
+          name: event.playerNames?.[i] || `Player ${i + 1}`,
+          hand: shuffledDeck.slice(startIdx, startIdx + 3),
+          score: 0,
+        };
       });
 
+      // Calculate remaining deck position
+      const deckStartIdx = playerCount * 3;
+
       // Deal one card to discard pile
-      const discardPile = [deck[0]];
-      deck = deck.slice(1);
+      const discardPile = [shuffledDeck[deckStartIdx]];
+
+      // Remaining deck
+      const deck = shuffledDeck.slice(deckStartIdx + 1);
 
       // Select random first player
       const currentPlayerIndex = randomInt(playerCount);
@@ -102,19 +106,19 @@ export const cardGameMachine = setup({
         deck,
         discardPile,
         selectedCards: [],
-        timerStartMs: Date.now(),
+        timerStartMs: performance.now(),
         timerRemainingMs: 180000, // 3 minutes
         roundScores: Object.fromEntries(players.map((p) => [p.id, 0])),
       };
     }),
 
     startTimer: assign({
-      timerStartMs: () => Date.now(),
+      timerStartMs: () => performance.now(),
     }),
 
     // Card actions
     selectCard: assign(({ context, event }) => {
-      if (event.type !== 'SELECT_CARD') return context;
+      if (event.type !== 'card.select') return context;
 
       const currentPlayer = context.players[context.currentPlayerIndex];
       const card = currentPlayer.hand.find((c) => c.id === event.cardId);
@@ -130,7 +134,7 @@ export const cardGameMachine = setup({
     }),
 
     deselectCard: assign(({ context, event }) => {
-      if (event.type !== 'DESELECT_CARD') return context;
+      if (event.type !== 'card.deselect') return context;
 
       return {
         ...context,
@@ -206,9 +210,9 @@ export const cardGameMachine = setup({
     })),
 
     updateTimer: assign(({ context, event }) => {
-      if (event.type !== 'TIMER_TICK') return context;
+      if (event.type !== 'timer.tick') return context;
 
-      const elapsed = Date.now() - context.timerStartMs;
+      const elapsed = performance.now() - context.timerStartMs;
       const remaining = Math.max(0, 180000 - elapsed);
 
       return {
@@ -287,7 +291,7 @@ export const cardGameMachine = setup({
   states: {
     idle: {
       on: {
-        START_GAME: {
+        'game.start': {
           target: 'setup',
           actions: 'initializeGame',
         },
@@ -306,7 +310,7 @@ export const cardGameMachine = setup({
         src: 'timer',
       },
       on: {
-        TIMER_TICK: {
+        'timer.tick': {
           actions: 'updateTimer',
         },
       },
@@ -343,13 +347,13 @@ export const cardGameMachine = setup({
 
             selecting: {
               on: {
-                SELECT_CARD: {
+                'card.select': {
                   actions: 'selectCard',
                 },
-                DESELECT_CARD: {
+                'card.deselect': {
                   actions: 'deselectCard',
                 },
-                PLAY_SELECTED: {
+                'card.play': {
                   guard: 'canPlaySelectedCards',
                   target: 'evaluating',
                   actions: 'playSelectedCards',

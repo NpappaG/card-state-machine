@@ -36,12 +36,12 @@ export type GameContext = {
   roundScores: Record<string, number>;
 };
 
-// Game events
+// Game events (using dot notation for XState v5 convention)
 export type GameEvent =
-  | { type: 'START_GAME'; playerCount: number; playerNames?: string[] }
-  | { type: 'SELECT_CARD'; cardId: string }
-  | { type: 'DESELECT_CARD'; cardId: string }
-  | { type: 'PLAY_SELECTED' }
-  | { type: 'TIMER_TICK' }
-  | { type: 'NEW_ROUND' }
-  | { type: 'GAME_OVER' };
+  | { type: 'game.start'; playerCount: number; playerNames?: string[] }
+  | { type: 'card.select'; cardId: string }
+  | { type: 'card.deselect'; cardId: string }
+  | { type: 'card.play' }
+  | { type: 'timer.tick' }
+  | { type: 'game.newRound' }
+  | { type: 'game.over' };
