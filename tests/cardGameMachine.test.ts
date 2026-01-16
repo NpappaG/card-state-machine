@@ -189,3 +189,60 @@ test('selecting state waits for valid card.play before transitioning', () => {
   // Cards should be played to discard
   expect(snapshot.context.discardPile.length).toBe(3);
 });
+
+// ============================================================================
+// Timing Behavior Tests
+// ============================================================================
+// These tests verify that delays create observable intermediate states.
+// Without delays, always transitions cascade instantly and intermediate
+// states are never visible.
+
+test('evaluating state is observable with EVALUATING_DELAY', () => {
+  const topCard = makeCard('6');
+  const match = makeCard('6', 'spades');
+  const player = makePlayer([match, makeCard('A')]);
+
+  const actor = buildActor(
+    { roundActive: { playerTurn: 'selecting' } },
+    {
+      players: [player],
+      discardPile: [topCard],
+      selectedCards: [match],
+    }
+  );
+
+  // Play card
+  actor.send({ type: 'card.play' });
+
+  const snapshot = actor.getSnapshot();
+  actor.stop();
+
+  // Should be in evaluating (waiting for EVALUATING_DELAY)
+  // Without delays, this would have cascaded to changingTurn instantly
+  expect(snapshot.matches({ roundActive: { playerTurn: 'evaluating' } })).toBe(true);
+  // Card should be played
+  expect(snapshot.context.discardPile.length).toBe(2);
+});
+
+test('checkingCards state exists briefly with CHECKING_DELAY', () => {
+  // Create actor in checkingCards state
+  const topCard = makeCard('9');
+  const match1 = makeCard('9', 'spades');
+  const match2 = makeCard('9', 'diamonds');
+  const player = makePlayer([match1, match2]);
+
+  const actor = buildActor(
+    { roundActive: { playerTurn: 'checkingCards' } },
+    {
+      players: [player],
+      discardPile: [topCard],
+    }
+  );
+
+  const snapshot = actor.getSnapshot();
+  actor.stop();
+
+  // Should still be in checkingCards (waiting for CHECKING_DELAY before routing)
+  // Without delays, would have instantly routed to selecting
+  expect(snapshot.matches({ roundActive: { playerTurn: 'checkingCards' } })).toBe(true);
+});

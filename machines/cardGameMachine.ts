@@ -119,27 +119,25 @@ export const cardGameMachine = setup({
           states: {
             checkingCards: {
               after: {
-                [GAME_TIMING.CHECKING_DELAY]: {
-                  always: [
-                    {
-                      guard: 'currentPlayerHasNoCards',
-                      target: '#cardGame.roundEnd',
-                    },
-                    {
-                      guard: 'hasMultipleValidCards',
-                      target: 'selecting',
-                    },
-                    {
-                      guard: 'hasSingleValidCard',
-                      target: 'evaluating',
-                      actions: 'autoPlaySingleCard',
-                    },
-                    {
-                      // No valid cards - must draw
-                      target: 'drawing',
-                    },
-                  ],
-                },
+                [GAME_TIMING.CHECKING_DELAY]: [
+                  {
+                    guard: 'currentPlayerHasNoCards',
+                    target: '#cardGame.roundEnd',
+                  },
+                  {
+                    guard: 'hasMultipleValidCards',
+                    target: 'selecting',
+                  },
+                  {
+                    guard: 'hasSingleValidCard',
+                    target: 'evaluating',
+                    actions: 'autoPlaySingleCard',
+                  },
+                  {
+                    // No valid cards - must draw
+                    target: 'drawing',
+                  },
+                ],
               },
             },
 
@@ -163,26 +161,22 @@ export const cardGameMachine = setup({
               entry: 'drawCard',
               after: {
                 [GAME_TIMING.DRAW_DELAY]: {
-                  always: {
-                    target: 'evaluating',
-                  },
+                  target: 'evaluating',
                 },
               },
             },
 
             evaluating: {
               after: {
-                [GAME_TIMING.EVALUATING_DELAY]: {
-                  always: [
-                    {
-                      guard: 'currentPlayerHasNoCards',
-                      target: '#cardGame.roundEnd',
-                    },
-                    {
-                      target: 'changingTurn',
-                    },
-                  ],
-                },
+                [GAME_TIMING.EVALUATING_DELAY]: [
+                  {
+                    guard: 'currentPlayerHasNoCards',
+                    target: '#cardGame.roundEnd',
+                  },
+                  {
+                    target: 'changingTurn',
+                  },
+                ],
               },
             },
 
