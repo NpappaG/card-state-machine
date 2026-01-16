@@ -1,0 +1,41 @@
+{
+  "name": "card-state-machine",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "bun test tests"
+  },
+  "dependencies": {
+    "@xstate/react": "^6.0.0",
+    "framer-motion": "^12.26.2",
+    "next": "16.1.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "xstate": "^5.25.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.18",
+    "@types/glob": "^9.0.0",
+    "@types/node": "^20.19.29",
+    "@types/react": "^19.2.8",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "^10.4.23",
+    "eslint": "^9.39.2",
+    "eslint-config-next": "16.1.1",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.18",
+    "typescript": "^5.9.3"
+  },
+  "ignoreScripts": [
+    "sharp",
+    "unrs-resolver"
+  ],
+  "trustedDependencies": [
+    "sharp",
+    "unrs-resolver"
+  ]
+}

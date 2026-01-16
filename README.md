@@ -1,10 +1,15 @@
 # card-state-machine
 
-A state machine architecture for a turn based card game system.
+A state machine architecture for a turn-based card game system using XState v5.
+
+## Status
+
+✅ **State Machine Complete** - Fully implemented game logic in `machines/cardGameMachine.ts`
+🚧 **UI In Progress** - React components to be built next
 
 ## Overview
 
-You are designing the state machine architecture for a turn based card game system.
+This project implements a turn-based card matching game where 2-4 players race to empty their hands (or finish with the lowest score) before a 3-minute timer expires.
 
 ## Game Mechanics
 
@@ -18,89 +23,87 @@ Achieve the lowest total hand value or dispose of all your cards before the 3-mi
 - Queen = 12 points
 - King = 13 points
 
-### Turn-based Play
+### Deck
 
-Players alternate placing cards on shared discard pile. You can only play cards that:
+Standard 52-card deck:
+- **Suits**: Hearts, Diamonds, Clubs, Spades (4 suits)
+- **Ranks**: Ace, 2, 3, 4, 5, 6, 7, 8, 9, 10, Jack, Queen, King (13 ranks per suit)
+- **Total Cards**: 52 cards
 
-- **Have the same value as top discard card (7 on 7, Queen on Queen)**
-- _If you cannnot play a match you have to take another from the deck_
+### Game Setup
+
+- **Players**: 2–4 (prompted at start)
+- **Initial Deal**: Each player receives 5 cards
+- **Starting Card**: One additional card is revealed to seed the discard pile
+- **First Player**: Randomly selected
+- **Timer**: Optional 3-minute round timer limits play
+
+### Turn Loop
+
+1. **Auto-play** – If the active player has exactly one card that matches the rank of the top discard card, it is played automatically.
+2. **Selecting** – If multiple cards match the top discard rank, the player can select/deselect those cards and press SPACE/“Play Selected” to place one (or several) on the discard pile.
+3. **Drawing** – If no matching cards exist, the player draws one card from the deck. Play immediately advances to the next player.
+
+This loop repeats in player order until a hand empties or the timer expires.
 
 ### Controls
 
-Single Card Play: Auto-play when only one valid card exists or have to pick up from the deck.
-Multiple Card Selection: When multiple valid cards are available:
+- Click a card to select/deselect it when the machine is in the `selecting` state.
+- Press SPACE (or the “Play Selected” button) to confirm the selection.
+- Auto-play runs without input whenever only one valid card exists.
 
-- Click cards to select/deselect them
-- SPACE key to play all selected cards as together
+### State Chart Outline
 
-### Pseudocode
+```
+idle
+  └─ 'game.start' → setup
 
-Alternatively use the following format propose state machine schema to model the card game, provide commentary on overarching design if there is more than one state machine.
+setup (entry: initializeGame + startTimer)
+  └─ always → roundActive
 
-StateMachine
-│
-├── Config
-│ └── Parallel: true | false
-│
-├── Context
-│ ├── exampleData1
-│ ├── exampleData2
-│ └── exampleData3
-│
-├── States
-│ ├── STATE_ONE
-│ │ ├── Description: Brief summary of this state
-│ │ └── Valid Events: EVENT_A(), EVENT_B()
-│ └── STATE_TWO
-│ ├── Description: Brief summary of this state
-│ └── Valid Events: EVENT_C()
-│
-├── Events
-│ ├── EVENT_A()
-│ │ ├── Trigger: What triggers EVENT_A
-│ │ └── Data: Payload or parameters (if any)
-│ ├── EVENT_B()
-│ │ ├── Trigger: What triggers EVENT_B
-│ │ └── Data: Payload or parameters (if any)
-│ └── EVENT_C()
-│ ├── Trigger: What triggers EVENT_C
-│ └── Data: Payload or parameters (if any)
-│
-├── Guards
-│ ├── guardOne()
-│ │ └── Purpose: What conditional this checks; reference context params
-│ └── guardTwo()
-│ └── Purpose: What conditional this checks: reference context params
-│
-├── Transitions
-│ ├── STATE_ONE → STATE_TWO
-│ │ ├── Event: EVENT_A()
-│ │ ├── Guard: guardOne()
-│ │ ├── Exit Action (STATE_ONE): exitActionOne()
-│ │ ├── Entry Action (STATE_TWO): entryActionTwo()
-│ │ ├── Transition Action: transitionAction()
-│ │ └── Target: STATE_TWO
-│ └── STATE_TWO → STATE_ONE
-│ ├── Event: EVENT_C()
-│ ├── Guard: guardTwo()
-│ ├── Exit Action (STATE_TWO): exitActionTwo()
-│ ├── Entry Action (STATE_ONE): entryActionOne()
-│ ├── Transition Action: transitionAction()
-│ └── Target: STATE_ONE
-│
-└── Actions
-├── exitActionOne()
-│ ├── Type: EXIT (STATE_ONE)
-│ └── Side Effect: Description of side effect or external impact
-├── entryActionOne()
-│ ├── Type: ENTRY (STATE_ONE)
-│ └── Side Effect: Description of side effect or external impact
-├── exitActionTwo()
-│ ├── Type: EXIT (STATE_TWO)
-│ └── Side Effect: Description of side effect or external impact
-├── entryActionTwo()
-│ ├── Type: ENTRY (STATE_TWO)
-│ └── Side Effect: Description of side effect or external impact
-└── transitionAction()
-├── Type: TRANSITION
-└── Side Effect: Description of side effect or external impact
+roundActive (invoke timer)
+  └─ playerTurn
+        checkingCards
+          ├─ no cards → roundEnd
+          ├─ multiple matches → selecting
+          ├─ single match → evaluating (auto-play)
+          └─ no matches → drawing
+        selecting
+          └─ 'card.play' (guard: canPlaySelectedCards) → evaluating
+        drawing (entry: drawCard)
+          └─ evaluating
+        evaluating
+          ├─ player empty → roundEnd
+          └─ changeTurn
+        changeTurn (entry: advanceTurn)
+          └─ checkingCards
+
+roundEnd (entry: calculateScores)
+```
+
+## Tech Stack
+
+- **State Management**: XState v5 (Actor Model)
+- **Framework**: Next.js 16+ with App Router
+- **Runtime**: Bun
+- **Language**: TypeScript 5+
+- **Styling**: Tailwind CSS v4
+
+## Getting Started
+
+```bash
+# Install dependencies
+bun install
+
+# Run development server
+bun run dev
+
+# Build for production
+bun run build
+```
+
+## Documentation
+
+- `docs/CLAUDE.md` - Complete architecture guide and implementation status
+- `docs/XSTATE_DOCS.md` - XState v5 reference
+- `machines/cardGameMachine.ts` - Main game state machine implementation
