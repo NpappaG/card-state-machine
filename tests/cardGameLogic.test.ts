@@ -74,24 +74,10 @@ describe('canPlaySelectedCards', () => {
     expect(Logic.canPlaySelectedCards(context)).toBe(true);
   });
 
-  test('returns true when multiple selected cards all match top discard', () => {
+  test('returns false when multiple cards are selected (only single card allowed)', () => {
     const topCard = makeCard('Q', 'hearts');
     const selected1 = makeCard('Q', 'spades');
     const selected2 = makeCard('Q', 'diamonds');
-    const selected3 = makeCard('Q', 'clubs');
-
-    const context = makeContext({
-      discardPile: [topCard],
-      selectedCards: [selected1, selected2, selected3],
-    });
-
-    expect(Logic.canPlaySelectedCards(context)).toBe(true);
-  });
-
-  test('returns false when any selected card does not match top discard', () => {
-    const topCard = makeCard('5', 'hearts');
-    const selected1 = makeCard('5', 'spades');
-    const selected2 = makeCard('7', 'diamonds'); // Different rank!
 
     const context = makeContext({
       discardPile: [topCard],

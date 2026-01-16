@@ -7,13 +7,14 @@ import { GAME_TIMING } from '@/lib/constants';
 
 /**
  * Check if selected cards can be played on the current discard pile.
- * All selected cards must match the rank of the top discard card.
+ * Must have exactly one card selected that matches the top discard card rank.
  */
 export function canPlaySelectedCards(context: GameContext): boolean {
-  if (context.selectedCards.length === 0) return false;
+  // Must have exactly one card selected
+  if (context.selectedCards.length !== 1) return false;
 
   const topCard = context.discardPile[context.discardPile.length - 1];
-  return context.selectedCards.every((card) => card.rank === topCard.rank);
+  return context.selectedCards[0].rank === topCard.rank;
 }
 
 /**

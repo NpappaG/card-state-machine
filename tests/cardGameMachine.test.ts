@@ -170,14 +170,13 @@ test('selecting state waits for valid card.play before transitioning', () => {
     }
   );
 
-  // Select cards
+  // Select one card (only single card selection allowed)
   actor.send({ type: 'card.select', cardId: match1.id });
-  actor.send({ type: 'card.select', cardId: match2.id });
 
   let snapshot = actor.getSnapshot();
   expect(snapshot.matches({ roundActive: { playerTurn: 'selecting' } })).toBe(true);
 
-  // Play selected cards
+  // Play selected card
   actor.send({ type: 'card.play' });
 
   snapshot = actor.getSnapshot();
@@ -186,8 +185,8 @@ test('selecting state waits for valid card.play before transitioning', () => {
   // Should transition out of selecting after valid play
   // (May be in evaluating or changingTurn depending on always transitions)
   expect(snapshot.matches({ roundActive: { playerTurn: 'selecting' } })).toBe(false);
-  // Cards should be played to discard
-  expect(snapshot.context.discardPile.length).toBe(3);
+  // One card should be played to discard
+  expect(snapshot.context.discardPile.length).toBe(2);
 });
 
 // ============================================================================
