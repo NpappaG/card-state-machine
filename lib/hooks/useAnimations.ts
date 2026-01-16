@@ -42,10 +42,9 @@ export function useAnimations(game: UseCardGameReturn) {
     // Animation timing (match these in Framer Motion components)
     timing: {
       checking: GAME_TIMING.CHECKING_DELAY,
-      cardPlay: GAME_TIMING.EVALUATING_DELAY,
+      cardPlay: GAME_TIMING.EVALUATING_DELAY, // Used for both auto-play and manual play
       cardDraw: GAME_TIMING.DRAW_DELAY,
       turnChange: GAME_TIMING.TURN_CHANGE_DELAY,
-      autoPlay: GAME_TIMING.AUTO_PLAY_DELAY,
     },
 
     // Recently played cards (for exit animations)

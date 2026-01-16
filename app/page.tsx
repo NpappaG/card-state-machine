@@ -10,11 +10,6 @@ export default function GamePage() {
   const animations = useAnimations(game);
   const [playerCount, setPlayerCount] = useState(2);
 
-  // Debug: Log state changes
-  console.log('Current state:', game.snapshot.value);
-  console.log('Current player:', game.currentPlayer?.name);
-  console.log('Top discard:', game.topDiscard?.rank);
-
   // Spacebar to play selected cards
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

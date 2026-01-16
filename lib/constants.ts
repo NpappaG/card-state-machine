@@ -29,25 +29,20 @@ export const GAME_TIMING = {
   CHECKING_DELAY: 300,
 
   /**
-   * Delay after auto-playing a single matching card.
-   * Shows the card moving to discard pile before continuing.
-   */
-  AUTO_PLAY_DELAY: 600,
-
-  /**
    * Delay after drawing a card when player has no matches.
    * Shows the card moving from deck to hand.
    */
   DRAW_DELAY: 500,
 
   /**
-   * Brief pause in evaluating state before determining next action.
+   * Pause after playing a card (auto or manual) before determining next action.
    * Creates visual separation between play and turn change.
+   * Used for both auto-play and manual play animations.
    */
   EVALUATING_DELAY: 400,
 
   /**
-   * Delay during turn change (already exists in machine).
+   * Delay during turn change.
    * Shows turn transition and gives players time to orient.
    */
   TURN_CHANGE_DELAY: 500,

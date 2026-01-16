@@ -81,9 +81,9 @@ export function Card({
   return (
     <motion.button
       className={`
-        relative flex flex-col items-center justify-between
-        rounded-xl bg-white p-3 shadow-lg
-        border-2 transition-all
+        relative flex flex-col items-center
+        rounded-xl bg-white shadow-lg
+        border-2 transition-all overflow-hidden
         ${isSelected ? 'border-blue-500 ring-4 ring-blue-300' : 'border-gray-300'}
         ${isDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:shadow-xl'}
         ${animationState === 'exiting' ? 'pointer-events-none' : ''}
@@ -96,29 +96,31 @@ export function Card({
       onClick={!isDisabled ? onClick : undefined}
       disabled={isDisabled}
       layout
-      style={{ width: '100px', height: '140px' }}
+      style={{ width: '100px', height: '140px', padding: '6px' }}
     >
       {/* Top-left rank and suit */}
-      <div className="flex flex-col items-center leading-none">
-        <span className="text-2xl font-bold" style={{ color: suitColor }}>
+      <div className="absolute top-1 left-1.5 flex flex-col items-center leading-none">
+        <span className="text-base font-bold" style={{ color: suitColor }}>
           {card.rank}
         </span>
-        <span className="text-3xl" style={{ color: suitColor }}>
+        <span className="text-lg leading-none" style={{ color: suitColor }}>
           {suitSymbol}
         </span>
       </div>
 
       {/* Center suit symbol (large) */}
-      <div className="text-5xl" style={{ color: suitColor }}>
-        {suitSymbol}
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-5xl leading-none" style={{ color: suitColor }}>
+          {suitSymbol}
+        </div>
       </div>
 
       {/* Bottom-right rank and suit (rotated) */}
-      <div className="flex flex-col items-center leading-none rotate-180">
-        <span className="text-2xl font-bold" style={{ color: suitColor }}>
+      <div className="absolute bottom-1 right-1.5 flex flex-col items-center leading-none rotate-180">
+        <span className="text-base font-bold" style={{ color: suitColor }}>
           {card.rank}
         </span>
-        <span className="text-3xl" style={{ color: suitColor }}>
+        <span className="text-lg leading-none" style={{ color: suitColor }}>
           {suitSymbol}
         </span>
       </div>
