@@ -56,8 +56,9 @@ export function StateTreeVisualizer({ currentState, game }: StateTreeVisualizerP
         /* Collapsed state - small label */
         <button
           onClick={() => setIsCollapsed(false)}
-          className="bg-black/90 hover:bg-black text-white rounded-lg px-4 py-2 border border-white/20 transition-colors cursor-pointer"
+          className="bg-black/90 hover:bg-black text-white rounded-lg px-4 py-2 border border-white/20 transition-colors cursor-pointer flex items-center gap-2"
         >
+          <span className="text-sm">🔍</span>
           <span className="text-xs font-mono">^ XState Visualizer ^</span>
         </button>
       ) : (
@@ -73,6 +74,16 @@ export function StateTreeVisualizer({ currentState, game }: StateTreeVisualizerP
             >
               ✕
             </button>
+          </div>
+
+          {/* Explanation */}
+          <div className="mb-2 pb-2 border-b border-white/10">
+            <p className="text-[9px] text-blue-300 font-mono leading-tight">
+              • Live XState v5 snapshot • Direct state machine data
+            </p>
+            <p className="text-[9px] text-blue-300 font-mono leading-tight mt-0.5">
+              • <span className="text-yellow-400">evaluating</span> = check win condition + animation delay
+            </p>
           </div>
 
           <div className="flex flex-col gap-0.5">
