@@ -2,12 +2,14 @@
 
 import { motion } from 'framer-motion';
 import type { Card as CardType } from '@/lib/types';
+import { cardAnimationVariants, cardDrawInitialState, CARD_FLIP_TIMING } from '@/lib/animations/cardAnimations';
+import { GAME_TIMING } from '@/lib/constants';
 
 interface CardProps {
   card: CardType;
   isSelected?: boolean;
   isDisabled?: boolean;
-  animationState?: 'idle' | 'selected' | 'exiting' | 'inHand' | 'entering';
+  animationState?: 'idle' | 'selected' | 'exiting' | 'inHand' | 'entering' | 'autoPlaying';
   onClick?: () => void;
   layoutId?: string;
   disabled?: boolean;
@@ -51,62 +53,13 @@ export function Card({
 }: CardProps) {
   const suitSymbol = SUIT_SYMBOLS[card.suit];
   const suitColor = SUIT_COLORS[card.suit];
-
-  // Animation variants
-  const variants = {
-    idle: {
-      scale: 1,
-      y: 0,
-      x: 0,
-      rotate: 0,
-      opacity: 1,
-    },
-    selected: {
-      scale: 1.05,
-      y: -10,
-      x: 0,
-      rotate: 0,
-      opacity: 1,
-    },
-    entering: {
-      scale: 1,
-      y: 0,
-      x: 0,
-      rotate: 0,
-      rotateY: 0,
-      opacity: 1,
-      transition: {
-        duration: 2.0,
-        ease: [0.4, 0, 0.2, 1], // Custom easeIn curve
-      },
-    },
-    exiting: {
-      scale: 0.9,
-      x: 0,
-      y: 0,
-      rotate: 0,
-      opacity: 1,
-      transition: {
-        duration: 2.0,
-        type: 'spring',
-        stiffness: 80,
-        damping: 15,
-      },
-    },
-    inHand: {
-      scale: 1,
-      y: 0,
-      x: 0,
-      rotate: 0,
-      opacity: 1,
-    },
-  };
-
   const isActuallyDisabled = isDisabled || disabled;
 
   const glowShadow =
     animationState === 'entering'
       ? 'shadow-[0_0_35px_rgba(37,99,235,0.45)] shadow-lg'
+      : animationState === 'autoPlaying'
+      ? 'shadow-[0_0_50px_rgba(245,158,11,0.8)] shadow-2xl'
       : 'shadow-lg';
 
   return (
@@ -115,18 +68,12 @@ export function Card({
         relative flex flex-col items-center overflow-hidden rounded-xl border-2 transition-all
         bg-white border-gray-300 ${glowShadow}
         ${isSelected ? 'border-blue-500 ring-4 ring-blue-300' : ''}
+        ${animationState === 'autoPlaying' ? 'border-yellow-400 ring-4 ring-yellow-300' : ''}
         ${isActuallyDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:shadow-xl'}
-        ${animationState === 'exiting' || animationState === 'entering' ? 'pointer-events-none' : ''}
+        ${animationState === 'exiting' || animationState === 'entering' || animationState === 'autoPlaying' ? 'pointer-events-none' : ''}
       `}
-      variants={variants}
-      initial={animationState === 'entering' ? {
-        y: -200,
-        x: -250,
-        scale: 0.7,
-        rotate: -15,
-        rotateY: 180,
-        opacity: 1
-      } : "idle"}
+      variants={cardAnimationVariants}
+      initial={animationState === 'entering' ? cardDrawInitialState : "idle"}
       animate={isSelected ? 'selected' : animationState}
       whileHover={!isActuallyDisabled && !isSelected ? { scale: 1.02 } : undefined}
       whileTap={!isActuallyDisabled ? { scale: 0.98 } : undefined}
@@ -148,8 +95,8 @@ export function Card({
           initial={{ opacity: 1 }}
           animate={{ opacity: 0 }}
           transition={{
-            delay: 1.0,
-            duration: 0.001,
+            delay: CARD_FLIP_TIMING.blueBackDelay,
+            duration: CARD_FLIP_TIMING.blueBackDuration,
           }}
         >
           <div className="absolute inset-2 rounded-lg border-2 border-blue-400/30" />
@@ -164,7 +111,10 @@ export function Card({
         style={{ padding: '6px' }}
         initial={animationState === 'entering' ? { opacity: 0 } : { opacity: 1 }}
         animate={{ opacity: 1 }}
-        transition={animationState === 'entering' ? { delay: 1.0, duration: 0.1 } : {}}
+        transition={animationState === 'entering' ? {
+          delay: CARD_FLIP_TIMING.faceFadeDelay,
+          duration: CARD_FLIP_TIMING.faceFadeDuration
+        } : {}}
       >
         {/* Top-left rank and suit */}
         <div className="absolute top-1 left-1.5 flex flex-col items-center leading-none">
@@ -201,6 +151,21 @@ export function Card({
           initial={{ opacity: 0 }}
           animate={{ opacity: 0.2 }}
           exit={{ opacity: 0 }}
+        />
+      )}
+
+      {/* Auto-play indicator overlay */}
+      {animationState === 'autoPlaying' && (
+        <motion.div
+          className="absolute inset-0 rounded-xl bg-amber-100 pointer-events-none"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: [0, 0.45, 0.4, 0.4] }}
+          exit={{ opacity: 0 }}
+          transition={{
+            duration: GAME_TIMING.CHECKING_DELAY / 1000,
+            times: [0, 0.2, 0.35, 1],
+            ease: 'easeOut'
+          }}
         />
       )}
     </motion.button>

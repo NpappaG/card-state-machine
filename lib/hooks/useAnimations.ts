@@ -14,12 +14,32 @@ import type { UseCardGameReturn } from './useCardGame';
 export function useAnimations(game: UseCardGameReturn) {
   const [lastPlayedCards, setLastPlayedCards] = useState<string[]>([]);
   const [lastDrawnCard, setLastDrawnCard] = useState<string | null>(null);
+  const [autoPlayingCards, setAutoPlayingCards] = useState<string[]>([]);
+
+  // Detect auto-play during checkingCards phase
+  useEffect(() => {
+    if (game.isCheckingCards && game.currentPlayer && game.discardPile.length > 0) {
+      const topCard = game.discardPile[game.discardPile.length - 1];
+      const matchingCards = game.currentPlayer.hand.filter(c => c.rank === topCard.rank);
+
+      // If exactly one matching card, mark it for auto-play animation
+      if (matchingCards.length === 1) {
+        setAutoPlayingCards([matchingCards[0].id]);
+      } else {
+        setAutoPlayingCards([]);
+      }
+    } else if (!game.isCheckingCards) {
+      // Clear auto-playing cards when we leave checkingCards
+      setAutoPlayingCards([]);
+    }
+  }, [game.isCheckingCards, game.currentPlayer, game.discardPile]);
 
   // Track cards that were just played (for exit animations)
   useEffect(() => {
     if (game.isEvaluating && game.discardPile.length > 0) {
       const topCards = game.discardPile.slice(-game.selectedCards.length || -1);
-      setLastPlayedCards(topCards.map((c) => c.id));
+      const playedCardIds = topCards.map((c) => c.id);
+      setLastPlayedCards(playedCardIds);
     }
   }, [game.isEvaluating, game.discardPile, game.selectedCards.length]);
 
@@ -69,9 +89,13 @@ export function useAnimations(game: UseCardGameReturn) {
     // Recently played cards (for exit animations)
     lastPlayedCards,
     lastDrawnCard,
+    autoPlayingCards,
 
     // Helpers for common animation patterns
     getCardAnimationState: (cardId: string) => {
+      if (autoPlayingCards.includes(cardId)) {
+        return 'autoPlaying'; // Card is auto-playing (pulse + fling)
+      }
       if (lastPlayedCards.includes(cardId)) {
         return 'exiting'; // Card is flying to discard
       }

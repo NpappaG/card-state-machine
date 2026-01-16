@@ -68,6 +68,10 @@ roundActive (invoke timer)
           ├─ multiple matches → selecting
           ├─ single match → evaluating (auto-play)
           └─ no matches → drawing
+        (Note: checkingCards has a topline delay that applies to all branches.
+         In the current architecture, this enables the auto-play amber highlight
+         animation but also delays manual selection and drawing paths. A potential
+         optimization would move the delay into the auto-play branch only.)
         selecting
           └─ 'card.play' (guard: canPlaySelectedCards) → evaluating
         drawing (entry: drawCard)
@@ -81,6 +85,28 @@ roundActive (invoke timer)
 roundEnd (entry: calculateScores)
 ```
 
+## Timing Architecture
+
+The state machine controls all timing via `GAME_TIMING` constants in `/lib/constants.ts`. These delays define finite time windows for each state, and UI animations are subordinate to these windows.
+
+**Design Principle:**
+- State machine delays define **state duration** (how long a state lasts)
+- Animations read these constants and **fill the available window**
+- As long as `animation duration ≤ state duration`, the system works correctly
+
+**Example:**
+```typescript
+CHECKING_DELAY: 2000  // State lasts 2000ms
+autoPlaying animation: duration = CHECKING_DELAY / 1000  // Uses full 2s
+```
+
+This is **time-based coordination** (not event-driven). The state machine is the clock - it doesn't wait for animations to signal completion. This approach is appropriate for games with predictable, fixed-duration animations where consistent timing is more important than perfect animation synchronization.
+
+**Alternative Approaches:**
+- Event-driven (animations send `ANIMATION_COMPLETE` events) would be more complex but allow variable-duration animations
+- Invoked actors (XState owns animation lifecycle) would couple state machine to UI layer
+- Current approach: Simple, maintainable, deterministic - good fit for fixed-duration game animations
+
 ## Tech Stack
 
 - **State Management**: XState v5 (Actor Model)
@@ -88,6 +114,7 @@ roundEnd (entry: calculateScores)
 - **Runtime**: Bun
 - **Language**: TypeScript 5+
 - **Styling**: Tailwind CSS v4
+- **Animations**: Framer Motion
 
 ## Getting Started
 

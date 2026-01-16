@@ -1,8 +1,9 @@
 'use client';
 
-import { motion } from 'framer-motion';
 import { useState } from 'react';
 import type { UseCardGameReturn } from '@/lib/hooks/useCardGame';
+import { StateNode } from './StateNode';
+import { calculateHandScore } from '@/lib/utils/scoreCalculator';
 
 interface StateTreeVisualizerProps {
   currentState: any;
@@ -21,34 +22,11 @@ export function StateTreeVisualizer({ currentState, game }: StateTreeVisualizerP
     c => c.rank === game.topDiscard?.rank
   ).length || 0;
 
-  const calculateHandScore = () => {
-    if (!game.currentPlayer) return 0;
-    const rankValues: Record<string, number> = {
-      'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
-      '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13
-    };
-    return game.currentPlayer.hand.reduce((sum, card) => sum + (rankValues[card.rank] || 0), 0);
-  };
-
-  const handScore = calculateHandScore();
+  const handScore = calculateHandScore(game.currentPlayer);
 
   const isInState = (state: string) => {
     return stateValue.includes(state);
   };
-
-  const StateNode = ({ name, isActive, level = 0 }: { name: string; isActive: boolean; level?: number }) => (
-    <motion.div
-      className={`
-        text-xs font-mono py-0.5 px-2 rounded transition-all
-        ${isActive ? 'bg-green-500/20 text-green-300 font-bold' : 'text-gray-400'}
-      `}
-      style={{ marginLeft: `${level * 12}px` }}
-      animate={isActive ? { scale: [1, 1.05, 1] } : { scale: 1 }}
-      transition={{ duration: 0.3 }}
-    >
-      {isActive && '▸ '}{name}
-    </motion.div>
-  );
 
   return (
     <div className="fixed right-4 bottom-4 z-50">

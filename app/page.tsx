@@ -2,7 +2,7 @@
 
 import { useCardGame } from '@/lib/hooks/useCardGame';
 import { useAnimations } from '@/lib/hooks/useAnimations';
-import { Card } from '@/components/Card';
+import { Card } from './components/card/Card';
 import { DeckStack } from './components/deck/DeckStack';
 import { DiscardStack } from './components/discard/DiscardStack';
 import { StateTreeVisualizer } from './components/StateTreeVisualizer';
@@ -215,6 +215,28 @@ export default function GamePage() {
       <div className="flex flex-1 flex-col gap-6">
         {/* Center area: Deck and Discard Pile */}
         <div className="flex items-center justify-center gap-8">
+          {/* Multiple options message */}
+          {game.isSelecting && game.selectedCards.length === 0 && (
+            <div className="rounded-lg bg-yellow-500/90 px-6 py-3 text-center shadow-lg">
+              <p className="text-sm font-semibold text-white">
+                You have multiple options
+              </p>
+              <p className="text-xs text-white/90">
+                Select a card to play
+              </p>
+            </div>
+          )}
+
+          {/* Play Card Button */}
+          {game.isSelecting && game.selectedCards.length > 0 && (
+            <button
+              onClick={handlePlayCards}
+              className="rounded-lg bg-blue-600 px-6 py-3 text-lg font-bold text-white shadow-lg transition-transform hover:scale-105 hover:bg-blue-700"
+            >
+              Play Card<br/>(Space)
+            </button>
+          )}
+
           {/* Deck */}
           <div className="flex flex-col items-center gap-2">
             <span className="text-sm font-semibold text-white">Deck</span>
@@ -303,17 +325,6 @@ export default function GamePage() {
           })}
         </div>
 
-        {/* Action buttons */}
-        <div className="flex justify-center gap-4">
-          {game.isSelecting && game.selectedCards.length > 0 && (
-            <button
-              onClick={handlePlayCards}
-              className="rounded-lg bg-blue-600 px-8 py-4 text-xl font-bold text-white shadow-lg transition-transform hover:scale-105 hover:bg-blue-700"
-            >
-              Play Card (Space)
-            </button>
-          )}
-        </div>
       </div>
     </div>
     </LayoutGroup>
