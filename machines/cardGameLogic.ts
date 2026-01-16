@@ -66,6 +66,54 @@ export function deckEmpty(context: GameContext): boolean {
   return context.deck.length === 0;
 }
 
+export type NextAction =
+  | 'ROUND_END'
+  | 'AUTO_PLAY'
+  | 'SELECTING_REQUIRED'
+  | 'DRAW_REQUIRED';
+
+/**
+ * Determines the next action for the current player based on game state.
+ *
+ * Decision Order:
+ * 1. ROUND_END - Current player has no cards (win condition)
+ * 2. AUTO_PLAY - Exactly one matching card (auto-play it)
+ * 3. SELECTING_REQUIRED - Multiple matching cards (manual selection)
+ * 4. ROUND_END - Deck is empty and no matching cards (can't continue)
+ * 5. DRAW_REQUIRED - No matching cards but deck has cards (must draw)
+ *
+ * Deck Empty Rule:
+ * When the deck runs out, the round ends. This prevents infinite loops where
+ * all players skip turns because no one has matching cards. The round ends when:
+ * - A player runs out of cards (wins), OR
+ * - The deck is exhausted (no more cards to draw), OR
+ * - The 3-minute timer expires
+ */
+export function determineNextAction(context: GameContext): NextAction {
+  // Check win condition first
+  if (currentPlayerHasNoCards(context)) {
+    return 'ROUND_END';
+  }
+
+  // Check for auto-play (single matching card)
+  if (hasSingleValidCard(context)) {
+    return 'AUTO_PLAY';
+  }
+
+  // Check for selection (multiple matching cards)
+  if (hasMultipleValidCards(context)) {
+    return 'SELECTING_REQUIRED';
+  }
+
+  // Check if deck is empty (can't draw, round ends)
+  if (deckEmpty(context)) {
+    return 'ROUND_END';
+  }
+
+  // Default: need to draw
+  return 'DRAW_REQUIRED';
+}
+
 // ============================================================================
 // HELPER FUNCTIONS (Pure)
 // ============================================================================

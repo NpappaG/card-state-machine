@@ -1,21 +1,27 @@
-import { setup, assign, fromCallback } from 'xstate';
-import type { GameContext, GameEvent } from '@/lib/types';
-import * as Logic from './cardGameLogic';
-import { GAME_TIMING } from '@/lib/constants';
+import { setup, assign, fromCallback, raise } from "xstate";
+import type { GameContext, GameEvent } from "@/lib/types";
+import * as Logic from "./cardGameLogic";
+import { GAME_TIMING } from "@/lib/constants";
 
 // Timer actor using fromCallback
 const timerLogic = fromCallback(({ sendBack }) => {
   const interval = setInterval(() => {
-    sendBack({ type: 'timer.tick' });
+    sendBack({ type: "timer.tick" });
   }, 1000); // Tick every second
 
   return () => clearInterval(interval);
 });
 
+type InternalEvent =
+  | { type: "ROUND_END" }
+  | { type: "AUTO_PLAY" }
+  | { type: "SELECTING_REQUIRED" }
+  | { type: "DRAW_REQUIRED" };
+
 export const cardGameMachine = setup({
   types: {
     context: {} as GameContext,
-    events: {} as GameEvent,
+    events: {} as GameEvent | InternalEvent,
   },
   actors: {
     timer: timerLogic,
@@ -23,55 +29,64 @@ export const cardGameMachine = setup({
   actions: {
     // Setup actions - delegating to pure functions from cardGameLogic.ts
     initializeGame: assign(({ event }) => {
-      if (event.type !== 'game.start') {
-        throw new Error('initializeGame called with wrong event type');
+      if (event.type !== "game.start") {
+        throw new Error("initializeGame called with wrong event type");
       }
       return Logic.initializeGameReducer(event.playerCount, event.playerNames);
     }),
 
     startTimer: assign(({ context }) => Logic.startTimerReducer(context)),
 
+    // Decision action - raises internal event based on game state
+    decideNextAction: raise(({ context }) => ({
+      type: Logic.determineNextAction(context),
+    })),
+
     // Card actions - delegating to pure functions from cardGameLogic.ts
     selectCard: assign(({ context, event }) => {
-      if (event.type !== 'card.select') return context;
+      if (event.type !== "card.select") return context;
       return Logic.selectCardReducer(context, event.cardId);
     }),
 
     deselectCard: assign(({ context, event }) => {
-      if (event.type !== 'card.deselect') return context;
+      if (event.type !== "card.deselect") return context;
       return Logic.deselectCardReducer(context, event.cardId);
     }),
 
-    playSelectedCards: assign(({ context }) => Logic.playSelectedCardsReducer(context)),
+    playSelectedCards: assign(({ context }) =>
+      Logic.playSelectedCardsReducer(context)
+    ),
 
-    autoPlaySingleCard: assign(({ context }) => Logic.autoPlaySingleCardReducer(context)),
+    autoPlaySingleCard: assign(({ context }) =>
+      Logic.autoPlaySingleCardReducer(context)
+    ),
 
     drawCard: assign(({ context }) => Logic.drawCardReducer(context)),
 
     advanceTurn: assign(({ context }) => Logic.advanceTurnReducer(context)),
 
     updateTimer: assign(({ context, event }) => {
-      if (event.type !== 'timer.tick') return context;
+      if (event.type !== "timer.tick") return context;
       return Logic.updateTimerReducer(context);
     }),
 
-    calculateScores: assign(({ context }) => Logic.calculateScoresReducer(context)),
+    calculateScores: assign(({ context }) =>
+      Logic.calculateScoresReducer(context)
+    ),
   },
 
   guards: {
     // Card validation guards - delegating to pure functions from cardGameLogic.ts
     canPlaySelectedCards: ({ context }) => Logic.canPlaySelectedCards(context),
-    hasMultipleValidCards: ({ context }) => Logic.hasMultipleValidCards(context),
-    hasSingleValidCard: ({ context }) => Logic.hasSingleValidCard(context),
 
     // Win condition guards - delegating to pure functions from cardGameLogic.ts
-    currentPlayerHasNoCards: ({ context }) => Logic.currentPlayerHasNoCards(context),
+    currentPlayerHasNoCards: ({ context }) =>
+      Logic.currentPlayerHasNoCards(context),
     timerExpired: ({ context }) => Logic.timerExpired(context),
-    deckEmpty: ({ context }) => Logic.deckEmpty(context),
   },
 }).createMachine({
-  id: 'cardGame',
-  initial: 'idle',
+  id: "cardGame",
+  initial: "idle",
   context: {
     players: [],
     currentPlayerIndex: 0,
@@ -85,84 +100,83 @@ export const cardGameMachine = setup({
   states: {
     idle: {
       on: {
-        'game.start': {
-          target: 'setup',
-          actions: 'initializeGame',
+        "game.start": {
+          target: "setup",
+          actions: "initializeGame",
         },
       },
     },
 
     setup: {
-      entry: 'startTimer',
+      entry: "startTimer",
       always: {
-        target: 'roundActive',
+        target: "roundActive",
       },
     },
 
     roundActive: {
       invoke: {
-        src: 'timer',
+        src: "timer",
       },
       on: {
-        'timer.tick': {
-          actions: 'updateTimer',
+        "timer.tick": {
+          actions: "updateTimer",
         },
       },
       always: {
-        guard: 'timerExpired',
-        target: 'roundEnd',
+        guard: "timerExpired",
+        target: "roundEnd",
       },
-      initial: 'playerTurn',
+      initial: "playerTurn",
       states: {
         playerTurn: {
-          initial: 'checkingCards',
+          initial: "checkingCards",
           states: {
             checkingCards: {
               after: {
-                [GAME_TIMING.CHECKING_DELAY]: [
-                  {
-                    guard: 'currentPlayerHasNoCards',
-                    target: '#cardGame.roundEnd',
-                  },
-                  {
-                    guard: 'hasMultipleValidCards',
-                    target: 'selecting',
-                  },
-                  {
-                    guard: 'hasSingleValidCard',
-                    target: 'evaluating',
-                    actions: 'autoPlaySingleCard',
-                  },
-                  {
-                    // No valid cards - must draw
-                    target: 'drawing',
-                  },
-                ],
+                [GAME_TIMING.CHECKING_DELAY]: "readyToAct",
+              },
+            },
+
+            readyToAct: {
+              entry: "decideNextAction",
+              on: {
+                ROUND_END: {
+                  target: "#cardGame.roundEnd",
+                },
+                AUTO_PLAY: {
+                  target: "evaluating",
+                  actions: "autoPlaySingleCard",
+                },
+                SELECTING_REQUIRED: {
+                  target: "selecting",
+                },
+                DRAW_REQUIRED: {
+                  target: "drawing",
+                },
               },
             },
 
             selecting: {
               on: {
-                'card.select': {
-                  actions: 'selectCard',
+                "card.select": {
+                  actions: "selectCard",
                 },
-                'card.deselect': {
-                  actions: 'deselectCard',
+                "card.deselect": {
+                  actions: "deselectCard",
                 },
-                'card.play': {
-                  guard: 'canPlaySelectedCards',
-                  target: 'evaluating',
-                  actions: 'playSelectedCards',
+                "card.play": {
+                  guard: "canPlaySelectedCards",
+                  target: "evaluating",
+                  actions: "playSelectedCards",
                 },
               },
             },
 
             drawing: {
-              entry: 'drawCard',
+              entry: "drawCard",
               after: {
-                [GAME_TIMING.DRAW_DELAY]: {
-                  target: 'evaluating',
-                },
+                [GAME_TIMING.DRAW_DELAY]: "evaluating",
               },
             },
 
@@ -170,20 +184,20 @@ export const cardGameMachine = setup({
               after: {
                 [GAME_TIMING.EVALUATING_DELAY]: [
                   {
-                    guard: 'currentPlayerHasNoCards',
-                    target: '#cardGame.roundEnd',
+                    guard: "currentPlayerHasNoCards",
+                    target: "#cardGame.roundEnd",
                   },
                   {
-                    target: 'changingTurn',
+                    target: "changingTurn",
                   },
                 ],
               },
             },
 
             changingTurn: {
-              entry: 'advanceTurn',
+              entry: "advanceTurn",
               after: {
-                [GAME_TIMING.TURN_CHANGE_DELAY]: 'checkingCards',
+                [GAME_TIMING.TURN_CHANGE_DELAY]: "checkingCards",
               },
             },
           },
@@ -192,8 +206,13 @@ export const cardGameMachine = setup({
     },
 
     roundEnd: {
-      entry: 'calculateScores',
-      type: 'final',
+      entry: "calculateScores",
+      on: {
+        "game.start": {
+          target: "setup",
+          actions: "initializeGame",
+        },
+      },
     },
   },
 });

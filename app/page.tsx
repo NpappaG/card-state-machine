@@ -134,11 +134,11 @@ export default function GamePage() {
                     key={playerId}
                     className="flex justify-between rounded-lg bg-white px-4 py-2"
                   >
-                    <span className="font-medium">
+                    <span className="font-medium text-gray-900">
                       {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : ''}
                       {' '}{player?.name}
                     </span>
-                    <span className="text-gray-600">{score} pts</span>
+                    <span className="text-gray-700">{score} pts</span>
                   </div>
                 );
               })}

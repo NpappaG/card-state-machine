@@ -38,6 +38,7 @@ export type GameContext = {
 
 // Game events (using dot notation for XState v5 convention)
 export type GameEvent =
+  // External events (from UI/user)
   | { type: 'game.start'; playerCount: number; playerNames?: string[] }
   | { type: 'card.select'; cardId: string }
   | { type: 'card.deselect'; cardId: string }
