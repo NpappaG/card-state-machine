@@ -3,6 +3,9 @@
 import { useCardGame } from '@/lib/hooks/useCardGame';
 import { useAnimations } from '@/lib/hooks/useAnimations';
 import { Card } from '@/components/Card';
+import { DeckStack } from './components/deck/DeckStack';
+import { DiscardStack } from './components/discard/DiscardStack';
+import { LayoutGroup } from 'framer-motion';
 import React, { useState } from 'react';
 
 export default function GamePage() {
@@ -158,7 +161,8 @@ export default function GamePage() {
 
   // Render active game
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-br from-green-700 to-green-900 p-4">
+    <LayoutGroup>
+      <div className="flex min-h-screen flex-col bg-gradient-to-br from-green-700 to-green-900 p-4">
       {/* Debug Panel */}
       <div className="mb-2 rounded-lg bg-black/80 p-3 text-xs text-white font-mono">
         <div>State: {JSON.stringify(game.snapshot.value)}</div>
@@ -216,19 +220,7 @@ export default function GamePage() {
           <div className="flex flex-col items-center gap-2">
             <span className="text-sm font-semibold text-white">Deck</span>
             <div className="relative" style={{ width: '100px', height: '140px' }}>
-              {game.deck.length > 0 ? (
-                <div className="relative h-full w-full rounded-xl bg-gradient-to-br from-blue-600 to-blue-800 border-2 border-blue-900 shadow-lg flex items-center justify-center">
-                  <div className="absolute inset-2 rounded-lg border-2 border-blue-400/30" />
-                  <div className="absolute inset-4 rounded border border-blue-400/20" />
-                  <span className="text-3xl font-bold text-white drop-shadow-lg z-10">
-                    {game.deck.length}
-                  </span>
-                </div>
-              ) : (
-                <div className="flex h-full w-full items-center justify-center rounded-xl border-2 border-dashed border-white/50 bg-green-800/50">
-                  <span className="text-white text-sm">Empty</span>
-                </div>
-              )}
+              <DeckStack cardCount={game.deck.length} />
             </div>
           </div>
 
@@ -236,13 +228,7 @@ export default function GamePage() {
           <div className="flex flex-col items-center gap-2">
             <span className="text-sm font-semibold text-white">Discard Pile</span>
             <div style={{ width: '100px', height: '140px' }}>
-              {game.topDiscard ? (
-                <Card card={game.topDiscard} isDisabled />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center rounded-lg border-2 border-dashed border-white/50 bg-green-800/50">
-                  <span className="text-white text-sm">Empty</span>
-                </div>
-              )}
+              <DiscardStack discardPile={game.discardPile} />
             </div>
           </div>
         </div>
@@ -289,6 +275,7 @@ export default function GamePage() {
                         isDisabled={!canInteract}
                         animationState={animState}
                         onClick={() => handleCardClick(card.id)}
+                        layoutId={card.id}
                       />
                     );
                   })}
@@ -311,5 +298,6 @@ export default function GamePage() {
         </div>
       </div>
     </div>
+    </LayoutGroup>
   );
 }

@@ -9,6 +9,8 @@ interface CardProps {
   isDisabled?: boolean;
   animationState?: 'idle' | 'selected' | 'exiting' | 'inHand';
   onClick?: () => void;
+  layoutId?: string;
+  disabled?: boolean;
 }
 
 // Suit symbols
@@ -44,6 +46,8 @@ export function Card({
   isDisabled = false,
   animationState = 'idle',
   onClick,
+  layoutId,
+  disabled = false,
 }: CardProps) {
   const suitSymbol = SUIT_SYMBOLS[card.suit];
   const suitColor = SUIT_COLORS[card.suit];
@@ -78,6 +82,8 @@ export function Card({
     },
   };
 
+  const isActuallyDisabled = isDisabled || disabled;
+
   return (
     <motion.button
       className={`
@@ -85,17 +91,18 @@ export function Card({
         rounded-xl bg-white shadow-lg
         border-2 transition-all overflow-hidden
         ${isSelected ? 'border-blue-500 ring-4 ring-blue-300' : 'border-gray-300'}
-        ${isDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:shadow-xl'}
+        ${isActuallyDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:shadow-xl'}
         ${animationState === 'exiting' ? 'pointer-events-none' : ''}
       `}
       variants={variants}
       initial="idle"
       animate={isSelected ? 'selected' : animationState}
-      whileHover={!isDisabled && !isSelected ? { scale: 1.02 } : undefined}
-      whileTap={!isDisabled ? { scale: 0.98 } : undefined}
-      onClick={!isDisabled ? onClick : undefined}
-      disabled={isDisabled}
+      whileHover={!isActuallyDisabled && !isSelected ? { scale: 1.02 } : undefined}
+      whileTap={!isActuallyDisabled ? { scale: 0.98 } : undefined}
+      onClick={!isActuallyDisabled ? onClick : undefined}
+      disabled={isActuallyDisabled}
       layout
+      layoutId={layoutId}
       style={{ width: '100px', height: '140px', padding: '6px' }}
     >
       {/* Top-left rank and suit */}
