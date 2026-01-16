@@ -13,7 +13,7 @@ interface DiscardStackProps {
  * Animated discard pile that shows stacked cards with the top card prominently displayed.
  * Shows last few cards stacked behind for visual depth.
  */
-export function DiscardStack({ discardPile, maxVisible = 3 }: DiscardStackProps) {
+export function DiscardStack({ discardPile, maxVisible = Infinity }: DiscardStackProps) {
   if (discardPile.length === 0) {
     return (
       <div className="flex h-full w-full items-center justify-center rounded-lg border-2 border-dashed border-white/50 bg-green-800/50">
@@ -22,8 +22,8 @@ export function DiscardStack({ discardPile, maxVisible = 3 }: DiscardStackProps)
     );
   }
 
-  // Get the last N cards to show as stack
-  const visibleCards = discardPile.slice(-maxVisible);
+  // Get the last N cards to show as stack (show all by default)
+  const visibleCards = maxVisible === Infinity ? discardPile : discardPile.slice(-maxVisible);
 
   return (
     <div className="relative h-full w-full">
@@ -32,6 +32,8 @@ export function DiscardStack({ discardPile, maxVisible = 3 }: DiscardStackProps)
           const isTop = idx === visibleCards.length - 1;
           const xOffset = idx * 30; // 30px horizontal offset to show rank/suit
           const rotation = idx * 1.5 - (visibleCards.length - 1) * 0.75; // Slight rotation spread
+          const depthFromTop = visibleCards.length - 1 - idx; // 0 for top, 1 for next, 2 for bottom
+          const opacity = isTop ? 1 : 1 - (depthFromTop * 0.03); // 3% reduction per card below
 
           return (
             <motion.div
@@ -45,7 +47,7 @@ export function DiscardStack({ discardPile, maxVisible = 3 }: DiscardStackProps)
               }}
               animate={{
                 scale: isTop ? 1 : 0.95,
-                opacity: isTop ? 1 : 0.7,
+                opacity: opacity,
                 x: xOffset,
                 y: 0,
                 rotate: isTop ? 0 : rotation,

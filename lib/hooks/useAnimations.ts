@@ -13,6 +13,7 @@ import type { UseCardGameReturn } from './useCardGame';
  */
 export function useAnimations(game: UseCardGameReturn) {
   const [lastPlayedCards, setLastPlayedCards] = useState<string[]>([]);
+  const [lastDrawnCard, setLastDrawnCard] = useState<string | null>(null);
 
   // Track cards that were just played (for exit animations)
   useEffect(() => {
@@ -21,6 +22,14 @@ export function useAnimations(game: UseCardGameReturn) {
       setLastPlayedCards(topCards.map((c) => c.id));
     }
   }, [game.isEvaluating, game.discardPile, game.selectedCards.length]);
+
+  // Track cards that were just drawn
+  useEffect(() => {
+    if (game.isDrawing && game.currentPlayer?.hand.length) {
+      const lastCard = game.currentPlayer.hand[game.currentPlayer.hand.length - 1];
+      setLastDrawnCard(lastCard?.id || null);
+    }
+  }, [game.isDrawing, game.currentPlayer?.hand]);
 
   // Clear after animation window
   useEffect(() => {
@@ -31,6 +40,16 @@ export function useAnimations(game: UseCardGameReturn) {
       return () => clearTimeout(timeout);
     }
   }, [game.isEvaluating, lastPlayedCards.length]);
+
+  // Clear drawn card after animation
+  useEffect(() => {
+    if (!game.isDrawing && lastDrawnCard) {
+      const timeout = setTimeout(() => {
+        setLastDrawnCard(null);
+      }, GAME_TIMING.DRAW_DELAY);
+      return () => clearTimeout(timeout);
+    }
+  }, [game.isDrawing, lastDrawnCard]);
 
   return {
     // State-based animation flags
@@ -49,11 +68,15 @@ export function useAnimations(game: UseCardGameReturn) {
 
     // Recently played cards (for exit animations)
     lastPlayedCards,
+    lastDrawnCard,
 
     // Helpers for common animation patterns
     getCardAnimationState: (cardId: string) => {
       if (lastPlayedCards.includes(cardId)) {
         return 'exiting'; // Card is flying to discard
+      }
+      if (lastDrawnCard === cardId) {
+        return 'entering'; // Card is being drawn
       }
       if (game.isCardSelected(cardId)) {
         return 'selected'; // Card is marked for play

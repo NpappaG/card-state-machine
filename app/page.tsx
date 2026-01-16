@@ -5,7 +5,8 @@ import { useAnimations } from '@/lib/hooks/useAnimations';
 import { Card } from '@/components/Card';
 import { DeckStack } from './components/deck/DeckStack';
 import { DiscardStack } from './components/discard/DiscardStack';
-import { LayoutGroup } from 'framer-motion';
+import { StateTreeVisualizer } from './components/StateTreeVisualizer';
+import { LayoutGroup, motion } from 'framer-motion';
 import React, { useState } from 'react';
 
 export default function GamePage() {
@@ -65,7 +66,9 @@ export default function GamePage() {
   // Render idle state (game start screen)
   if (game.isIdle) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-green-700 to-green-900 p-4">
+      <>
+        <StateTreeVisualizer currentState={game.snapshot.value} game={game} />
+        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-green-700 to-green-900 p-4">
         <div className="flex flex-col items-center gap-6 rounded-xl bg-white p-8 shadow-2xl">
           <h1 className="text-4xl font-bold text-gray-800">Card Matching Game</h1>
           <p className="text-center text-gray-600">
@@ -104,6 +107,7 @@ export default function GamePage() {
           </button>
         </div>
       </div>
+      </>
     );
   }
 
@@ -116,7 +120,9 @@ export default function GamePage() {
     const winner = game.players.find((p) => p.id === winnerId);
 
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-green-700 to-green-900 p-4">
+      <>
+        <StateTreeVisualizer currentState={game.snapshot.value} game={game} />
+        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-green-700 to-green-900 p-4">
         <div className="flex flex-col items-center gap-6 rounded-xl bg-white p-8 shadow-2xl">
           <h1 className="text-4xl font-bold text-gray-800">Round Over!</h1>
 
@@ -156,24 +162,17 @@ export default function GamePage() {
           </button>
         </div>
       </div>
+      </>
     );
   }
 
   // Render active game
   return (
     <LayoutGroup>
+      {/* State Tree Visualizer - Fixed to right side */}
+      <StateTreeVisualizer currentState={game.snapshot.value} game={game} />
+
       <div className="flex min-h-screen flex-col bg-gradient-to-br from-green-700 to-green-900 p-4">
-      {/* Debug Panel */}
-      <div className="mb-2 rounded-lg bg-black/80 p-3 text-xs text-white font-mono">
-        <div>State: {JSON.stringify(game.snapshot.value)}</div>
-        <div>Current Player: {game.currentPlayer?.name} ({game.currentPlayerIndex})</div>
-        <div>Hand Size: {game.currentPlayer?.hand.length}</div>
-        <div>Top Discard: {game.topDiscard?.rank} of {game.topDiscard?.suit}</div>
-        <div>Hand Cards: {game.currentPlayer?.hand.map(c => c.rank).join(', ')}</div>
-        <div>Matching Cards: {game.currentPlayer?.hand.filter(c => c.rank === game.topDiscard?.rank).length}</div>
-        <div>Deck: {game.deck.length} cards</div>
-        <div>Selected: {game.selectedCards.length} cards</div>
-      </div>
 
       {/* Header with timer and game status */}
       <div className="mb-4 flex items-center justify-between rounded-lg bg-white/90 p-4 shadow-lg backdrop-blur">
@@ -221,6 +220,25 @@ export default function GamePage() {
             <span className="text-sm font-semibold text-white">Deck</span>
             <div className="relative" style={{ width: '100px', height: '140px' }}>
               <DeckStack cardCount={game.deck.length} />
+              {animations.shouldAnimateCardDraw && (
+                <motion.div
+                  className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                  initial={{ opacity: 0, scale: 0.7, x: 0, y: 0, rotate: -5 }}
+                  animate={{
+                    opacity: [0, 1, 1, 0],
+                    scale: [0.7, 1.05, 1],
+                    x: [0, 80, 140],
+                    y: [0, 40, 120],
+                    rotate: [-5, 0, 3],
+                  }}
+                  transition={{
+                    duration: animations.timing.cardDraw / 1000,
+                    ease: 'easeOut',
+                  }}
+                >
+                  <div className="h-28 w-20 rounded-xl border-2 border-blue-400/70 bg-gradient-to-br from-blue-500 to-blue-700 shadow-[0_0_25px_rgba(59,130,246,0.5)]" />
+                </motion.div>
+              )}
             </div>
           </div>
 
