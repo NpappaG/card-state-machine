@@ -1,0 +1,128 @@
+import { test, expect } from 'bun:test';
+import { createActor } from 'xstate';
+import { cardGameMachine } from '../machines/cardGameMachine';
+import type { Card, GameContext, Player, Rank, Suit } from '../lib/types';
+
+function makeCard(rank: Rank, suit: Suit = 'hearts'): Card {
+  const values: Record<Rank, number> = {
+    A: 1,
+    '2': 2,
+    '3': 3,
+    '4': 4,
+    '5': 5,
+    '6': 6,
+    '7': 7,
+    '8': 8,
+    '9': 9,
+    '10': 10,
+    J: 11,
+    Q: 12,
+    K: 13,
+  };
+
+  return {
+    id: `${suit}-${rank}`,
+    rank,
+    suit,
+    value: values[rank],
+  };
+}
+
+function makePlayer(hand: Card[], id = 'player-1'): Player {
+  return { id, name: id, hand, score: 0 };
+}
+
+function buildActor(value: any, context: Partial<GameContext>) {
+  const fullContext: GameContext = {
+    players: context.players ?? [makePlayer([])],
+    currentPlayerIndex: context.currentPlayerIndex ?? 0,
+    deck: context.deck ?? [],
+    discardPile: context.discardPile ?? [],
+    selectedCards: context.selectedCards ?? [],
+    timerStartMs: context.timerStartMs ?? 0,
+    timerRemainingMs: context.timerRemainingMs ?? 180000,
+    roundScores: context.roundScores ?? {},
+  };
+
+  const snapshot = cardGameMachine.resolveState({
+    value,
+    context: fullContext,
+  });
+
+  return createActor(cardGameMachine, { snapshot }).start();
+}
+
+test('selecting state transitions to evaluating when selection matches top card', () => {
+  const topCard = makeCard('K');
+  const selection = [makeCard('K', 'hearts')];
+  const player = makePlayer([selection[0], makeCard('Q')]);
+
+  const actor = buildActor(
+    { roundActive: { playerTurn: 'selecting' } },
+    {
+      players: [player],
+      discardPile: [topCard],
+      selectedCards: selection,
+    }
+  );
+
+  actor.send({ type: 'card.play' });
+  const next = actor.getSnapshot();
+  actor.stop();
+  expect(next.value).toEqual({ roundActive: { playerTurn: 'changingTurn' } });
+  expect(next.context.players[0].hand.length).toBe(1);
+});
+
+test('invalid selection keeps machine in selecting state', () => {
+  const topCard = makeCard('5');
+  const selection = [makeCard('7'), makeCard('7', 'spades')];
+  const player = makePlayer([...selection, makeCard('5', 'clubs')]);
+
+  const actor = buildActor(
+    { roundActive: { playerTurn: 'selecting' } },
+    {
+      players: [player],
+      discardPile: [topCard],
+      selectedCards: selection,
+    }
+  );
+
+  actor.send({ type: 'card.play' });
+  const next = actor.getSnapshot();
+  actor.stop();
+  expect(next.value).toEqual({ roundActive: { playerTurn: 'selecting' } });
+});
+
+test('card.select adds card to selection when available', () => {
+  const card = makeCard('J');
+  const player = makePlayer([card]);
+  const actor = buildActor(
+    { roundActive: { playerTurn: 'selecting' } },
+    {
+      players: [player],
+      selectedCards: [],
+    }
+  );
+
+  actor.send({ type: 'card.select', cardId: card.id });
+  const next = actor.getSnapshot();
+  actor.stop();
+  expect(next.context.selectedCards.length).toBe(1);
+  expect(next.context.selectedCards[0].id).toBe(card.id);
+});
+
+test('card.deselect removes card from selection', () => {
+  const card = makeCard('9');
+  const actor = buildActor(
+    { roundActive: { playerTurn: 'selecting' } },
+    {
+      players: [makePlayer([card])],
+      selectedCards: [card],
+    }
+  );
+
+  actor.send({ type: 'card.deselect', cardId: card.id });
+  const next = actor.getSnapshot();
+  actor.stop();
+  expect(next.context.selectedCards.length).toBe(0);
+});

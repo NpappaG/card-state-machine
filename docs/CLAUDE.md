@@ -31,17 +31,22 @@ bun run lint
 
 ## Game Rules
 
-### Scoring
-- Ace = 1 point
-- Number cards (2-10) = Face value
-- Jack = 11, Queen = 12, King = 13
+### Setup
+- Prompt for player count (2–4)
+- Deal 5 cards per player and reveal one more card to start the discard pile
+- Randomly select the starting player
 
-### Core Mechanic
-Players can only play cards that match the value of the top discard card (7 on 7, Queen on Queen). If no match exists, player must draw from the deck.
+### Turn Loop
+1. If exactly one card matches the top discard rank, auto-play it.
+2. If multiple cards match, enter `selecting` and wait for the user to choose the card(s) to play.
+3. If no matches exist, draw one card from the deck and end the turn.
+
+### Scoring
+- Ace = 1 point, King = 13 (used when tallying round scores)
 
 ### Controls
-- **Single valid card**: Auto-play
-- **Multiple valid cards**: Click to select/deselect, SPACE key to play selected cards together
+- **Auto**: Single matching card plays immediately.
+- **Manual**: Click to select/deselect cards, press SPACE (or the “Play Selected” button) to commit them.
 
 ## State Machine Architecture
 
@@ -112,43 +117,34 @@ StateMachine
 ### Current State Structure
 ```
 idle
-  └─ on 'game.start' → setup
+  └─ 'game.start' → setup
 
-setup (entry: initializeGame, startTimer)
+setup (entry: initializeGame + startTimer)
   └─ always → roundActive
 
-roundActive (invoke: timer, always check: timerExpired → roundEnd)
+roundActive (invoke timer, always guard timerExpired → roundEnd)
   └─ playerTurn
-      └─ checkingCards (entry point each turn)
-          ├─ No cards? → roundEnd (player wins!)
-          ├─ Multiple valid cards? → selecting
-          ├─ Single valid card? → evaluating (auto-play)
-          └─ No valid cards? → drawing
-
-      └─ selecting (user choosing cards)
-          ├─ on 'card.select' → add to selection
-          ├─ on 'card.deselect' → remove from selection
-          └─ on 'card.play' (guard: valid) → evaluating
-
-      └─ drawing (forced draw)
-          └─ entry: drawCard → always → evaluating
-
-      └─ evaluating (check win conditions)
-          ├─ Player has no cards? → roundEnd
-          └─ else → changingTurn
-
-      └─ changingTurn (entry: advanceTurn, after: 500ms)
-          └─ after 500ms → checkingCards (next player)
+        checkingCards
+          ├─ no cards → roundEnd
+          ├─ multiple matches → selecting
+          ├─ single match → evaluating (auto)
+          └─ no matches → drawing
+        selecting
+          └─ 'card.play' (guard: canPlaySelectedCards) → evaluating
+        drawing (entry: drawCard) → evaluating
+        evaluating
+          ├─ player empty → roundEnd
+          └─ changeTurn
+        changeTurn (entry: advanceTurn) → checkingCards
 
 roundEnd (entry: calculateScores, type: final)
 ```
 
 ### Key Features
-- **Auto-play**: Single valid card plays automatically (no user input needed)
-- **Multi-select**: Multiple valid cards require user selection
-- **Turn animation**: 500ms window in `changingTurn` state for UI transitions
-- **Always guard**: Timer checked continuously at `roundActive` level (works in any substate)
-- **Pure flow**: All transitions driven by guards, no manual event sending needed
+- **Auto-play singles**: One matching card plays instantly.
+- **Manual matches**: Multiple matches drop into `selecting`.
+- **Draw-and-go**: No matches trigger a draw, then evaluation immediately.
+- **Timer guard**: `roundActive` continuously checks the round timer.
 
 ### Events Used
 ```typescript
@@ -162,7 +158,7 @@ roundEnd (entry: calculateScores, type: final)
 ### Context Structure
 ```typescript
 {
-  players: Player[],           // 2-8 players with hands
+  players: Player[],           // 2-4 players with five-card hands
   currentPlayerIndex: number,  // Active player
   deck: Card[],                // Remaining cards
   discardPile: Card[],         // Played cards (top = last)

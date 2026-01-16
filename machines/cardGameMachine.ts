@@ -72,24 +72,24 @@ export const cardGameMachine = setup({
     initializeGame: assign(({ context, event }) => {
       if (event.type !== 'game.start') return context;
 
-      const playerCount = Math.max(2, Math.min(8, event.playerCount));
+      const playerCount = Math.max(2, Math.min(4, event.playerCount));
 
       // Create and shuffle deck
       const shuffledDeck = shuffle(createDeck());
 
-      // Deal 3 cards to each player (pure - no mutation)
+      // Deal 5 cards to each player (pure - no mutation)
       const players: Player[] = Array.from({ length: playerCount }, (_, i) => {
-        const startIdx = i * 3;
+        const startIdx = i * 5;
         return {
           id: `player-${i + 1}`,
           name: event.playerNames?.[i] || `Player ${i + 1}`,
-          hand: shuffledDeck.slice(startIdx, startIdx + 3),
+          hand: shuffledDeck.slice(startIdx, startIdx + 5),
           score: 0,
         };
       });
 
       // Calculate remaining deck position
-      const deckStartIdx = playerCount * 3;
+      const deckStartIdx = playerCount * 5;
 
       // Deal one card to discard pile
       const discardPile = [shuffledDeck[deckStartIdx]];
