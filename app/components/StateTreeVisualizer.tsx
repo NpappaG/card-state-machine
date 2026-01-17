@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { UseCardGameReturn } from '@/lib/hooks/useCardGame';
 import { StateNode } from './StateNode';
 import { calculateHandScore } from '@/lib/utils/scoreCalculator';
@@ -15,7 +15,21 @@ interface StateTreeVisualizerProps {
  * Fixed to the right side with collapse functionality
  */
 export function StateTreeVisualizer({ currentState, game }: StateTreeVisualizerProps) {
+  // Always start collapsed to match SSR
   const [isCollapsed, setIsCollapsed] = useState(true);
+
+  // Restore from localStorage after hydration
+  useEffect(() => {
+    const stored = localStorage.getItem('xstate-visualizer-collapsed');
+    if (stored !== null) {
+      setIsCollapsed(stored === 'true');
+    }
+  }, []);
+
+  // Persist collapse state to localStorage
+  useEffect(() => {
+    localStorage.setItem('xstate-visualizer-collapsed', String(isCollapsed));
+  }, [isCollapsed]);
   const stateValue = typeof currentState === 'object' ? JSON.stringify(currentState) : String(currentState);
 
   const matchingCards = game.currentPlayer?.hand.filter(

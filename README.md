@@ -2,11 +2,6 @@
 
 A state machine architecture for a turn-based card game system using XState v5.
 
-## Status
-
-✅ **State Machine Complete** - Fully implemented game logic in `machines/cardGameMachine.ts`
-🚧 **UI In Progress** - React components to be built next
-
 ## Overview
 
 This project implements a turn-based card matching game where 2-4 players race to empty their hands (or finish with the lowest score) before a 3-minute timer expires.
@@ -23,12 +18,7 @@ Achieve the lowest total hand value or dispose of all your cards before the 3-mi
 - Queen = 12 points
 - King = 13 points
 
-### Deck
-
-Standard 52-card deck:
-- **Suits**: Hearts, Diamonds, Clubs, Spades (4 suits)
-- **Ranks**: Ace, 2, 3, 4, 5, 6, 7, 8, 9, 10, Jack, Queen, King (13 ranks per suit)
-- **Total Cards**: 52 cards
+Standard 52-card deck in play.
 
 ### Game Setup
 
@@ -56,10 +46,7 @@ This loop repeats in player order until a hand empties or the timer expires.
 
 ```
 idle
-  └─ 'game.start' → setup
-
-setup (entry: initializeGame + startTimer)
-  └─ always → roundActive
+  └─ 'game.start' (actions: initializeGame + startTimer) → roundActive
 
 roundActive (invoke timer)
   └─ playerTurn
@@ -90,11 +77,13 @@ roundEnd (entry: calculateScores)
 The state machine controls all timing via `GAME_TIMING` constants in `/lib/constants.ts`. These delays define finite time windows for each state, and UI animations are subordinate to these windows.
 
 **Design Principle:**
+
 - State machine delays define **state duration** (how long a state lasts)
 - Animations read these constants and **fill the available window**
 - As long as `animation duration ≤ state duration`, the system works correctly
 
 **Example:**
+
 ```typescript
 CHECKING_DELAY: 2000  // State lasts 2000ms
 autoPlaying animation: duration = CHECKING_DELAY / 1000  // Uses full 2s
@@ -103,9 +92,36 @@ autoPlaying animation: duration = CHECKING_DELAY / 1000  // Uses full 2s
 This is **time-based coordination** (not event-driven). The state machine is the clock - it doesn't wait for animations to signal completion. This approach is appropriate for games with predictable, fixed-duration animations where consistent timing is more important than perfect animation synchronization.
 
 **Alternative Approaches:**
+
 - Event-driven (animations send `ANIMATION_COMPLETE` events) would be more complex but allow variable-duration animations
 - Invoked actors (XState owns animation lifecycle) would couple state machine to UI layer
 - Current approach: Simple, maintainable, deterministic - good fit for fixed-duration game animations
+
+**Known Trade-off: Topline Delay**
+
+The `checkingCards` state has a 2000ms delay that applies to ALL branches (auto-play, selection, drawing). This creates a "topline bottleneck":
+
+- **Auto-play path**: ✅ Needs the 2s for amber highlight animation
+- **Manual selection path**: ⚠️ Delays user interaction by 2s even when ready to select
+- **Drawing path**: ⚠️ Adds 2s pause before drawing begins
+
+**Why keep it:**
+
+- Simplifies state machine structure (single delay point vs. per-branch delays)
+- Round timer continues during delay, adding time pressure to decisions
+- Auto-play animation looks polished with full 2s highlight
+
+**Potential optimization:**
+Move delay into `autoPlaying` sub-state so selection/drawing can be instant:
+
+```
+checkingCards (instant) → readyToAct
+  ├─ AUTO_PLAY → autoPlaying (2000ms) → evaluating
+  ├─ SELECTING_REQUIRED → selecting (instant)
+  └─ DRAW_REQUIRED → drawing (instant)
+```
+
+This would make the game more responsive while maintaining auto-play animation quality. Deferred for future iteration.
 
 ## Tech Stack
 
@@ -131,6 +147,14 @@ bun run build
 
 ## Documentation
 
-- `docs/CLAUDE.md` - Complete architecture guide and implementation status
-- `docs/XSTATE_DOCS.md` - XState v5 reference
+- `docs/XSTATE_DOCS.md` - XState v5 reference for context
 - `machines/cardGameMachine.ts` - Main game state machine implementation
+- `docs/` for more agent notes
+
+## My notes on it
+
+Xstate is a convenient single source of truth - I definitely see the appeal for complex UI flows. It does seems intuitive that you have one ironclad skeleton for state and everything else subscribed to it.
+
+I wanted to keep the state machine as minimal as possible and keep all UI concerns separate - that seemed like a core thing from the suggested video I watched. (Interestingly, the guy said Stately's UI formatter was bad, but I found it helpful at first to double check logic directions - it does seem to break down with some v5 syntax).
+
+The more I learned, the more complexities arose actually. Mostly with regard to timing animations, I realized they were getting cutoff/running longer than the allotted delay windows. Then I just made the animation length a function of their possible window and realized it was a fine enough solution for a quick game. I see where devs might add more plumbing like a ui.animationComplete, and so on.

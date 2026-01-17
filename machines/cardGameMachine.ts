@@ -101,16 +101,9 @@ export const cardGameMachine = setup({
     idle: {
       on: {
         "game.start": {
-          target: "setup",
-          actions: "initializeGame",
+          target: "roundActive",
+          actions: ["initializeGame", "startTimer"],
         },
-      },
-    },
-
-    setup: {
-      entry: "startTimer",
-      always: {
-        target: "roundActive",
       },
     },
 
@@ -209,8 +202,8 @@ export const cardGameMachine = setup({
       entry: "calculateScores",
       on: {
         "game.start": {
-          target: "setup",
-          actions: "initializeGame",
+          target: "roundActive",
+          actions: ["initializeGame", "startTimer"],
         },
       },
     },
