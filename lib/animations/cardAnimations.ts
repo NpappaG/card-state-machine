@@ -61,28 +61,28 @@ export function buildCardAnimationVariants(timing?: {
     },
     autoPlaying: buildAutoPlayingAnimation(checkingDelay),
     entering: {
-      scale: 1,
-      y: 0,
-      x: 0,
-      rotate: 0,
-      rotateY: 0,
-      opacity: 1,
+      scale: [0.7, 1.05, 0.98, 1],
+      y: [-200, 0, -5, 0],
+      x: [-250, 0, 3, 0],
+      rotate: [-15, 2, -1, 0],
+      rotateY: [180, 0, 0, 0],
+      opacity: [0, 1, 1, 1],
       transition: {
         duration: drawDelay / 1000,
-        ease: [0.4, 0, 0.2, 1], // Custom easeIn curve
+        times: [0, 0.5, 0.75, 1], // Travel 50%, wriggle 50%-75%, settle 75%-100%
+        ease: [0.34, 1.56, 0.64, 1], // Elastic ease with slight overshoot
       },
     },
     exiting: {
-      scale: 0.9,
-      x: 0,
-      y: 0,
-      rotate: 0,
-      opacity: 1,
+      scale: [1, 1.15, 0.85],
+      x: [0, 15, 0],
+      y: [0, -30, -10],
+      rotate: [0, 8, 12],
+      opacity: [1, 1, 0.7],
       transition: {
         duration: evaluatingDelay / 1000,
-        type: 'spring' as const,
-        stiffness: 80,
-        damping: 15,
+        times: [0, 0.4, 1],
+        ease: [0.4, 0, 0.6, 1],
       },
     },
     inHand: {

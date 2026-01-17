@@ -78,6 +78,19 @@ export default function GamePage() {
           <StateTreeVisualizer currentState={game.snapshot.value} game={game} />
         </div>
 
+        {/* GitHub link - Bottom left */}
+        <div className="fixed left-4 bottom-4 z-50">
+          <a
+            href="https://github.com/npappag/card-state-machine"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-black/90 hover:bg-black text-white rounded-lg px-3 py-2 border border-white/20 transition-colors text-xs font-mono flex items-center gap-2"
+          >
+            <span>🔗</span>
+            <span>Full Code on Github</span>
+          </a>
+        </div>
+
         <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-green-700 to-green-900 p-4">
           <div className="flex flex-col items-center gap-6 rounded-xl bg-white p-8 shadow-2xl">
             <h1 className="text-4xl font-bold text-gray-800">
@@ -137,6 +150,19 @@ export default function GamePage() {
         <div className="fixed right-4 bottom-4 z-50 flex items-end gap-4">
           <SpeedControls />
           <StateTreeVisualizer currentState={game.snapshot.value} game={game} />
+        </div>
+
+        {/* GitHub link - Bottom left */}
+        <div className="fixed left-4 bottom-4 z-50">
+          <a
+            href="https://github.com/npappag/card-state-machine"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-black/90 hover:bg-black text-white rounded-lg px-3 py-2 border border-white/20 transition-colors text-xs font-mono flex items-center gap-2"
+          >
+            <span>🔗</span>
+            <span>Full Code on Github</span>
+          </a>
         </div>
 
         <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-green-700 to-green-900 p-4">
@@ -201,6 +227,19 @@ export default function GamePage() {
 
         {/* State Tree Visualizer - Right side */}
         <StateTreeVisualizer currentState={game.snapshot.value} game={game} />
+      </div>
+
+      {/* GitHub link - Bottom left */}
+      <div className="fixed left-4 bottom-4 z-50">
+        <a
+          href="https://github.com/npappag/card-state-machine"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="bg-black/90 hover:bg-black text-white rounded-lg px-3 py-2 border border-white/20 transition-colors text-xs font-mono flex items-center gap-2"
+        >
+          <span>🔗</span>
+          <span>GitHub</span>
+        </a>
       </div>
 
       <div className="flex min-h-screen flex-col bg-gradient-to-br from-green-700 to-green-900 p-4">
