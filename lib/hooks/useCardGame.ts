@@ -1,7 +1,9 @@
 'use client';
 
 import { useMachine } from '@xstate/react';
+import { useEffect } from 'react';
 import { cardGameMachine } from '@/machines/cardGameMachine';
+import { useTiming } from '@/lib/contexts/TimingContext';
 
 /**
  * Primary React hook for accessing card game state machine.
@@ -16,6 +18,28 @@ import { cardGameMachine } from '@/machines/cardGameMachine';
  */
 export function useCardGame() {
   const [snapshot, send, actor] = useMachine(cardGameMachine);
+  const timing = useTiming();
+
+  // Sync timing context to state machine
+  useEffect(() => {
+    send({
+      type: 'timing.update',
+      timing: {
+        CHECKING_DELAY: timing.CHECKING_DELAY,
+        DRAW_DELAY: timing.DRAW_DELAY,
+        EVALUATING_DELAY: timing.EVALUATING_DELAY,
+        TURN_CHANGE_DELAY: timing.TURN_CHANGE_DELAY,
+        ROUND_DURATION_MS: timing.ROUND_DURATION_MS,
+      },
+    });
+  }, [
+    timing.CHECKING_DELAY,
+    timing.DRAW_DELAY,
+    timing.EVALUATING_DELAY,
+    timing.TURN_CHANGE_DELAY,
+    timing.ROUND_DURATION_MS,
+    send,
+  ]);
 
   // Derived state
   const currentPlayer = snapshot.context.players[snapshot.context.currentPlayerIndex];

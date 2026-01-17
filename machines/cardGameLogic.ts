@@ -184,7 +184,14 @@ export function randomInt(max: number): number {
  */
 export function initializeGameReducer(
   playerCount: number,
-  playerNames?: string[]
+  playerNames?: string[],
+  timing: GameContext['timing'] = {
+    CHECKING_DELAY: GAME_TIMING.CHECKING_DELAY,
+    DRAW_DELAY: GAME_TIMING.DRAW_DELAY,
+    EVALUATING_DELAY: GAME_TIMING.EVALUATING_DELAY,
+    TURN_CHANGE_DELAY: GAME_TIMING.TURN_CHANGE_DELAY,
+    ROUND_DURATION_MS: GAME_TIMING.ROUND_DURATION_MS,
+  }
 ): GameContext {
   const clampedPlayerCount = Math.max(2, Math.min(4, playerCount));
 
@@ -221,8 +228,9 @@ export function initializeGameReducer(
     discardPile,
     selectedCards: [],
     timerStartMs: performance.now(),
-    timerRemainingMs: GAME_TIMING.ROUND_DURATION_MS,
+    timerRemainingMs: timing.ROUND_DURATION_MS,
     roundScores: Object.fromEntries(players.map((p) => [p.id, 0])),
+    timing,
   };
 }
 
@@ -352,7 +360,7 @@ export function advanceTurnReducer(context: GameContext): GameContext {
  */
 export function updateTimerReducer(context: GameContext): GameContext {
   const elapsed = performance.now() - context.timerStartMs;
-  const remaining = Math.max(0, GAME_TIMING.ROUND_DURATION_MS - elapsed);
+  const remaining = Math.max(0, context.timing.ROUND_DURATION_MS - elapsed);
 
   return {
     ...context,

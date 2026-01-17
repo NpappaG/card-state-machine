@@ -34,6 +34,15 @@ export type GameContext = {
 
   // Scoring
   roundScores: Record<string, number>;
+
+  // Timing configuration (dynamic)
+  timing: {
+    CHECKING_DELAY: number;
+    DRAW_DELAY: number;
+    EVALUATING_DELAY: number;
+    TURN_CHANGE_DELAY: number;
+    ROUND_DURATION_MS: number;
+  };
 };
 
 // Game events (using dot notation for XState v5 convention)

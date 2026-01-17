@@ -25,27 +25,21 @@ export const GAME_TIMING = {
   /**
    * Delay before checking which cards are playable.
    * Gives players a moment to see the current game state before action.
+   * Long enough to show auto-play amber highlight animation.
    */
-  CHECKING_DELAY: 300,
+  CHECKING_DELAY: 1000,
 
   /**
    * Delay after drawing a card when player has no matches.
-   * Shows the card moving from deck to hand.
+   * Shows the card moving from deck to hand and flipping.
    */
-  DRAW_DELAY: 500,
-
+  DRAW_DELAY: 1155,
   /**
-   * Pause after playing a card (auto or manual) before determining next action.
-   * Creates visual separation between play and turn change.
-   * Used for both auto-play and manual play animations.
+   * Visual breathing room
    */
+
   EVALUATING_DELAY: 400,
-
-  /**
-   * Delay during turn change.
-   * Shows turn transition and gives players time to orient.
-   */
-  TURN_CHANGE_DELAY: 500,
+  TURN_CHANGE_DELAY: 400,
 
   /**
    * Round timer duration (3 minutes in milliseconds).

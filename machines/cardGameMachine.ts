@@ -16,7 +16,8 @@ type InternalEvent =
   | { type: "ROUND_END" }
   | { type: "AUTO_PLAY" }
   | { type: "SELECTING_REQUIRED" }
-  | { type: "DRAW_REQUIRED" };
+  | { type: "DRAW_REQUIRED" }
+  | { type: "timing.update"; timing: GameContext['timing'] };
 
 export const cardGameMachine = setup({
   types: {
@@ -28,11 +29,11 @@ export const cardGameMachine = setup({
   },
   actions: {
     // Setup actions - delegating to pure functions from cardGameLogic.ts
-    initializeGame: assign(({ event }) => {
+    initializeGame: assign(({ event, context }) => {
       if (event.type !== "game.start") {
         throw new Error("initializeGame called with wrong event type");
       }
-      return Logic.initializeGameReducer(event.playerCount, event.playerNames);
+      return Logic.initializeGameReducer(event.playerCount, event.playerNames, context.timing);
     }),
 
     startTimer: assign(({ context }) => Logic.startTimerReducer(context)),
@@ -73,6 +74,18 @@ export const cardGameMachine = setup({
     calculateScores: assign(({ context }) =>
       Logic.calculateScoresReducer(context)
     ),
+
+    updateTimingConfig: assign(({ event }) => {
+      if (event.type !== "timing.update") return {};
+      return { timing: event.timing };
+    }),
+  },
+
+  delays: {
+    checkingDelay: ({ context }) => context.timing.CHECKING_DELAY,
+    drawDelay: ({ context }) => context.timing.DRAW_DELAY,
+    evaluatingDelay: ({ context }) => context.timing.EVALUATING_DELAY,
+    turnChangeDelay: ({ context }) => context.timing.TURN_CHANGE_DELAY,
   },
 
   guards: {
@@ -96,21 +109,26 @@ export const cardGameMachine = setup({
     timerStartMs: 0,
     timerRemainingMs: GAME_TIMING.ROUND_DURATION_MS,
     roundScores: {},
+    timing: {
+      CHECKING_DELAY: GAME_TIMING.CHECKING_DELAY,
+      DRAW_DELAY: GAME_TIMING.DRAW_DELAY,
+      EVALUATING_DELAY: GAME_TIMING.EVALUATING_DELAY,
+      TURN_CHANGE_DELAY: GAME_TIMING.TURN_CHANGE_DELAY,
+      ROUND_DURATION_MS: GAME_TIMING.ROUND_DURATION_MS,
+    },
+  },
+  on: {
+    "timing.update": {
+      actions: "updateTimingConfig",
+    },
   },
   states: {
     idle: {
       on: {
         "game.start": {
-          target: "setup",
-          actions: "initializeGame",
+          target: "roundActive",
+          actions: ["initializeGame", "startTimer"],
         },
-      },
-    },
-
-    setup: {
-      entry: "startTimer",
-      always: {
-        target: "roundActive",
       },
     },
 
@@ -134,7 +152,7 @@ export const cardGameMachine = setup({
           states: {
             checkingCards: {
               after: {
-                [GAME_TIMING.CHECKING_DELAY]: "readyToAct",
+                checkingDelay: "readyToAct",
               },
             },
 
@@ -176,13 +194,13 @@ export const cardGameMachine = setup({
             drawing: {
               entry: "drawCard",
               after: {
-                [GAME_TIMING.DRAW_DELAY]: "evaluating",
+                drawDelay: "evaluating",
               },
             },
 
             evaluating: {
               after: {
-                [GAME_TIMING.EVALUATING_DELAY]: [
+                evaluatingDelay: [
                   {
                     guard: "currentPlayerHasNoCards",
                     target: "#cardGame.roundEnd",
@@ -197,7 +215,7 @@ export const cardGameMachine = setup({
             changingTurn: {
               entry: "advanceTurn",
               after: {
-                [GAME_TIMING.TURN_CHANGE_DELAY]: "checkingCards",
+                turnChangeDelay: "checkingCards",
               },
             },
           },
@@ -209,8 +227,8 @@ export const cardGameMachine = setup({
       entry: "calculateScores",
       on: {
         "game.start": {
-          target: "setup",
-          actions: "initializeGame",
+          target: "roundActive",
+          actions: ["initializeGame", "startTimer"],
         },
       },
     },
