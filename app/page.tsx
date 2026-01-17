@@ -72,7 +72,12 @@ export default function GamePage() {
   if (game.isIdle) {
     return (
       <>
-        <StateTreeVisualizer currentState={game.snapshot.value} game={game} />
+        {/* Bottom right controls */}
+        <div className="fixed right-4 bottom-4 z-50 flex items-end gap-4">
+          <SpeedControls />
+          <StateTreeVisualizer currentState={game.snapshot.value} game={game} />
+        </div>
+
         <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-green-700 to-green-900 p-4">
           <div className="flex flex-col items-center gap-6 rounded-xl bg-white p-8 shadow-2xl">
             <h1 className="text-4xl font-bold text-gray-800">
@@ -128,7 +133,12 @@ export default function GamePage() {
 
     return (
       <>
-        <StateTreeVisualizer currentState={game.snapshot.value} game={game} />
+        {/* Bottom right controls */}
+        <div className="fixed right-4 bottom-4 z-50 flex items-end gap-4">
+          <SpeedControls />
+          <StateTreeVisualizer currentState={game.snapshot.value} game={game} />
+        </div>
+
         <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-green-700 to-green-900 p-4">
           <div className="flex flex-col items-center gap-6 rounded-xl bg-white p-8 shadow-2xl">
             <h1 className="text-4xl font-bold text-gray-800">Round Over!</h1>
