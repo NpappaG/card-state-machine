@@ -2,8 +2,7 @@
 
 import { motion } from 'framer-motion';
 import type { Card as CardType } from '@/lib/types';
-import { cardAnimationVariants, cardDrawInitialState, CARD_FLIP_TIMING } from '@/lib/animations/cardAnimations';
-import { GAME_TIMING } from '@/lib/constants';
+import { cardAnimationVariants, cardDrawInitialState, CARD_FLIP_TIMING, buildAmberOverlayConfig } from '@/lib/animations/cardAnimations';
 
 interface CardProps {
   card: CardType;
@@ -155,19 +154,18 @@ export function Card({
       )}
 
       {/* Auto-play indicator overlay */}
-      {animationState === 'autoPlaying' && (
-        <motion.div
-          className="absolute inset-0 rounded-xl bg-amber-100 pointer-events-none"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: [0, 0.45, 0.4, 0.4] }}
-          exit={{ opacity: 0 }}
-          transition={{
-            duration: GAME_TIMING.CHECKING_DELAY / 1000,
-            times: [0, 0.2, 0.35, 1],
-            ease: 'easeOut'
-          }}
-        />
-      )}
+      {animationState === 'autoPlaying' && (() => {
+        const amberConfig = buildAmberOverlayConfig();
+        return (
+          <motion.div
+            className="absolute inset-0 rounded-xl bg-amber-100 pointer-events-none"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: amberConfig.opacity }}
+            exit={{ opacity: 0 }}
+            transition={amberConfig.transition}
+          />
+        );
+      })()}
     </motion.button>
   );
 }

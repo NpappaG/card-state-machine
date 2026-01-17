@@ -31,7 +31,7 @@ Standard 52-card deck in play.
 ### Turn Loop
 
 1. **Auto-play** – If the active player has exactly one card that matches the rank of the top discard card, it is played automatically.
-2. **Selecting** – If multiple cards match the top discard rank, the player can select/deselect those cards and press SPACE/“Play Selected” to place one (or several) on the discard pile.
+2. **Selecting** – If multiple cards match the top discard rank, the player can select/deselect those cards and press SPACE/“Play Selected” to place exactly one matching card on the discard pile.
 3. **Drawing** – If no matching cards exist, the player draws one card from the deck. Play immediately advances to the next player.
 
 This loop repeats in player order until a hand empties or the timer expires.
@@ -39,7 +39,7 @@ This loop repeats in player order until a hand empties or the timer expires.
 ### Controls
 
 - Click a card to select/deselect it when the machine is in the `selecting` state.
-- Press SPACE (or the “Play Selected” button) to confirm the selection.
+- Press SPACE (or the “Play Selected” button) to confirm the single-card selection.
 - Auto-play runs without input whenever only one valid card exists.
 
 ### State Chart Outline
@@ -82,12 +82,46 @@ The state machine controls all timing via `GAME_TIMING` constants in `/lib/const
 - Animations read these constants and **fill the available window**
 - As long as `animation duration ≤ state duration`, the system works correctly
 
-**Example:**
+**Current timing window values (from `/lib/constants.ts`):**
+
+| Segment          | Constant                      | Duration (ms) | Purpose                                                  |
+| ---------------- | ----------------------------- | ------------- | -------------------------------------------------------- |
+| Check playable   | `GAME_TIMING.CHECKING_DELAY`  | 1000          | Buffer before any auto-play/select/draw action           |
+| Draw animation   | `GAME_TIMING.DRAW_DELAY`      | 1155          | Covers deck-to-hand travel + flip                       |
+| Evaluate result  | `GAME_TIMING.EVALUATING_DELAY`| 400           | Lets discard animations finish + checks win condition    |
+| Turn highlight   | `GAME_TIMING.TURN_CHANGE_DELAY`| 400          | Gives UI time to highlight the next player               |
+| Round timer      | `GAME_TIMING.ROUND_DURATION_MS`| 180000       | 3-minute round duration                                  |
+
+**Proportional Animation System:**
+
+Animations calculate their keyframe timing proportionally based on fixed phase durations:
 
 ```typescript
-CHECKING_DELAY: 2000  // State lasts 2000ms
-autoPlaying animation: duration = CHECKING_DELAY / 1000  // Uses full 2s
+// Animation builder calculates timing from state duration
+function buildAutoPlayingAnimation() {
+  const totalDuration = GAME_TIMING.CHECKING_DELAY; // 2000ms
+  const liftDuration = 400;   // Fixed: lift phase
+  const settleDuration = 300; // Fixed: settle phase
+  // Hold phase = remainder (1300ms)
+
+  // Calculate proportional keyframe positions
+  const liftEnd = liftDuration / totalDuration;     // 0.2 (20%)
+  const settleEnd = (lift + settle) / totalDuration; // 0.35 (35%)
+
+  return {
+    scale: [1, 1.1, 1.08, 1.08],
+    transition: {
+      duration: totalDuration / 1000, // 2s
+      times: [0, liftEnd, settleEnd, 1], // Calculated, not hardcoded
+    },
+  };
+}
 ```
+
+If `CHECKING_DELAY` changes to 3000ms, the animation automatically adjusts:
+- Lift: 400ms (13.3%)
+- Settle: 300ms (10%)
+- Hold: 2300ms (76.7%)
 
 This is **time-based coordination** (not event-driven). The state machine is the clock - it doesn't wait for animations to signal completion. This approach is appropriate for games with predictable, fixed-duration animations where consistent timing is more important than perfect animation synchronization.
 
@@ -99,29 +133,80 @@ This is **time-based coordination** (not event-driven). The state machine is the
 
 **Known Trade-off: Topline Delay**
 
-The `checkingCards` state has a 2000ms delay that applies to ALL branches (auto-play, selection, drawing). This creates a "topline bottleneck":
+The `checkingCards` state has a 1000ms delay that applies to ALL branches (auto-play, selection, drawing). This creates a "topline bottleneck":
 
-- **Auto-play path**: ✅ Needs the 2s for amber highlight animation
-- **Manual selection path**: ⚠️ Delays user interaction by 2s even when ready to select
-- **Drawing path**: ⚠️ Adds 2s pause before drawing begins
+- **Auto-play path**: ✅ Needs the 1s buffer for the amber highlight animation
+- **Manual selection path**: ⚠️ Adds a short pause before the user can click
+- **Drawing path**: ⚠️ Adds a short pause before the draw animation begins
 
 **Why keep it:**
 
 - Simplifies state machine structure (single delay point vs. per-branch delays)
-- Round timer continues during delay, adding time pressure to decisions
-- Auto-play animation looks polished with full 2s highlight
+- Round timer continues during the delay, adding time pressure
+- Auto-play animation still has a predictable window
 
 **Potential optimization:**
-Move delay into `autoPlaying` sub-state so selection/drawing can be instant:
+Move most of the delay into an `autoPlaying` branch so selection/drawing can be instantaneous:
 
 ```
 checkingCards (instant) → readyToAct
-  ├─ AUTO_PLAY → autoPlaying (2000ms) → evaluating
+  ├─ AUTO_PLAY → autoPlaying (1000ms) → evaluating
   ├─ SELECTING_REQUIRED → selecting (instant)
   └─ DRAW_REQUIRED → drawing (instant)
 ```
 
 This would make the game more responsive while maintaining auto-play animation quality. Deferred for future iteration.
+
+## State Machine Schema
+
+### Config
+- Parallel: `false`
+
+### Context
+- `players`: Array of `{ id, name, hand, score }`
+- `currentPlayerIndex`: Index of active player
+- `deck`: Remaining draw pile
+- `discardPile`: Cards that have been played
+- `selectedCards`: Currently highlighted cards (max 1)
+- `timerStartMs`, `timerRemainingMs`: Track 3-minute timer
+- `roundScores`: Final scores recorded at round end
+
+### States
+- `idle`: Await `game.start`
+- `roundActive`
+  - `playerTurn`
+    - `checkingCards`: delay window before acting
+    - `readyToAct`: raises internal decision events
+    - `selecting`: player chooses a matching card
+    - `drawing`: forced draw animation
+    - `evaluating`: check win condition or continue
+    - `changingTurn`: advance to next player
+- `roundEnd`: Scores calculated, wait for restart
+
+### Events
+- External: `game.start`, `card.select`, `card.deselect`, `card.play`, `timer.tick`
+- Internal (raised): `ROUND_END`, `AUTO_PLAY`, `SELECTING_REQUIRED`, `DRAW_REQUIRED`
+
+### Guards
+- `canPlaySelectedCards`: Exactly one selected card matches top discard
+- `currentPlayerHasNoCards`: Active hand is empty
+- `timerExpired`: Timer reached zero
+
+### Transitions (highlights)
+- `idle` --`game.start / initializeGame + startTimer`--> `roundActive`
+- `checkingCards` --after `CHECKING_DELAY`--> `readyToAct`
+- `readyToAct` --`AUTO_PLAY / autoPlaySingleCard`--> `evaluating`
+- `readyToAct` --`SELECTING_REQUIRED`--> `selecting`
+- `readyToAct` --`DRAW_REQUIRED`--> `drawing`
+- `drawing` --after `DRAW_DELAY`--> `evaluating`
+- `evaluating` --`currentPlayerHasNoCards`--> `roundEnd`
+- `evaluating` --else--> `changingTurn`
+- `changingTurn` --after `TURN_CHANGE_DELAY / advanceTurn`--> `checkingCards`
+- `roundActive` --`timerExpired`--> `roundEnd`
+
+### Actions
+- `initializeGame`, `startTimer`, `decideNextAction`, `selectCard`, `deselectCard`, `playSelectedCards`
+- `autoPlaySingleCard`, `drawCard`, `advanceTurn`, `updateTimer`, `calculateScores`
 
 ## Tech Stack
 
