@@ -2,7 +2,8 @@
 
 import { motion } from 'framer-motion';
 import type { Card as CardType } from '@/lib/types';
-import { cardAnimationVariants, cardDrawInitialState, CARD_FLIP_TIMING, buildAmberOverlayConfig } from '@/lib/animations/cardAnimations';
+import { buildCardAnimationVariants, cardDrawInitialState, buildCardFlipTiming, buildAmberOverlayConfig } from '@/lib/animations/cardAnimations';
+import { useTiming } from '@/lib/contexts/TimingContext';
 
 interface CardProps {
   card: CardType;
@@ -50,9 +51,14 @@ export function Card({
   layoutId,
   disabled = false,
 }: CardProps) {
+  const timing = useTiming();
   const suitSymbol = SUIT_SYMBOLS[card.suit];
   const suitColor = SUIT_COLORS[card.suit];
   const isActuallyDisabled = isDisabled || disabled;
+
+  // Build animation variants and timing with current context values
+  const cardAnimationVariants = buildCardAnimationVariants(timing);
+  const cardFlipTiming = buildCardFlipTiming(timing.DRAW_DELAY);
 
   const glowShadow =
     animationState === 'entering'
@@ -87,15 +93,16 @@ export function Card({
         transformStyle: 'preserve-3d',
       }}
     >
-      {/* Card back design (shown when entering/face-down) - Hidden exactly at 90deg rotation */}
+      {/* Card back design (shown when entering/face-down) */}
       {animationState === 'entering' && (
         <motion.div
-          className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl z-40"
+          className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl"
+          style={{ zIndex: 50 }}
           initial={{ opacity: 1 }}
           animate={{ opacity: 0 }}
           transition={{
-            delay: CARD_FLIP_TIMING.blueBackDelay,
-            duration: CARD_FLIP_TIMING.blueBackDuration,
+            delay: cardFlipTiming.blueBackDelay,
+            duration: cardFlipTiming.blueBackDuration,
           }}
         >
           <div className="absolute inset-2 rounded-lg border-2 border-blue-400/30" />
@@ -104,16 +111,16 @@ export function Card({
         </motion.div>
       )}
 
-      {/* Card face content - hidden during flip */}
+      {/* Card face content - starts hidden during entering, fades in at flip */}
       <motion.div
         className="absolute inset-0 flex flex-col items-center"
-        style={{ padding: '6px' }}
-        initial={animationState === 'entering' ? { opacity: 0 } : { opacity: 1 }}
+        style={{ padding: '6px', zIndex: 10 }}
+        initial={{ opacity: animationState === 'entering' ? 0 : 1 }}
         animate={{ opacity: 1 }}
         transition={animationState === 'entering' ? {
-          delay: CARD_FLIP_TIMING.faceFadeDelay,
-          duration: CARD_FLIP_TIMING.faceFadeDuration
-        } : {}}
+          delay: cardFlipTiming.faceFadeDelay,
+          duration: cardFlipTiming.faceFadeDuration
+        } : { duration: 0 }}
       >
         {/* Top-left rank and suit */}
         <div className="absolute top-1 left-1.5 flex flex-col items-center leading-none">
@@ -155,7 +162,7 @@ export function Card({
 
       {/* Auto-play indicator overlay */}
       {animationState === 'autoPlaying' && (() => {
-        const amberConfig = buildAmberOverlayConfig();
+        const amberConfig = buildAmberOverlayConfig(timing.CHECKING_DELAY);
         return (
           <motion.div
             className="absolute inset-0 rounded-xl bg-amber-100 pointer-events-none"

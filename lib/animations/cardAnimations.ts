@@ -2,16 +2,20 @@ import { GAME_TIMING } from '@/lib/constants';
 
 /**
  * Build autoPlaying animation with timing calculated from CHECKING_DELAY
- * Phases: Lift (400ms) → Settle (300ms) → Hold (remainder)
+ * Phases: Lift (20%) → Settle (15%) → Hold (65%)
+ * All phases scale proportionally with the total duration
  */
-function buildAutoPlayingAnimation() {
-  const totalDuration = GAME_TIMING.CHECKING_DELAY; // in ms
-  const liftDuration = 400;
-  const settleDuration = 300;
+function buildAutoPlayingAnimation(checkingDelay: number = GAME_TIMING.CHECKING_DELAY) {
+  const totalDuration = checkingDelay; // in ms
 
-  // Calculate proportional keyframe positions
-  const liftEnd = liftDuration / totalDuration;
-  const settleEnd = (liftDuration + settleDuration) / totalDuration;
+  // Proportional phase percentages (instead of fixed milliseconds)
+  const liftPercent = 0.20;    // 20% for lift
+  const settlePercent = 0.15;  // 15% for settle
+  // holdPercent = 0.65 (65% for hold - implicit)
+
+  // Calculate keyframe positions
+  const liftEnd = liftPercent;
+  const settleEnd = liftPercent + settlePercent;
 
   return {
     scale: [1, 1.1, 1.08, 1.08],
@@ -21,65 +25,81 @@ function buildAutoPlayingAnimation() {
     opacity: 1,
     transition: {
       duration: totalDuration / 1000, // Convert to seconds
-      times: [0, liftEnd, settleEnd, 1], // Calculated from phase durations
+      times: [0, liftEnd, settleEnd, 1], // Proportional keyframes
       ease: [0.4, 0, 0.2, 1],
     },
   };
 }
 
 /**
- * Card animation variants for different states
+ * Build card animation variants with dynamic timing values
  * Used by the Card component for smooth transitions
  */
-export const cardAnimationVariants = {
-  idle: {
-    scale: 1,
-    y: 0,
-    x: 0,
-    rotate: 0,
-    opacity: 1,
-  },
-  selected: {
-    scale: 1.05,
-    y: -10,
-    x: 0,
-    rotate: 0,
-    opacity: 1,
-  },
-  autoPlaying: buildAutoPlayingAnimation(),
-  entering: {
-    scale: 1,
-    y: 0,
-    x: 0,
-    rotate: 0,
-    rotateY: 0,
-    opacity: 1,
-    transition: {
-      duration: GAME_TIMING.DRAW_DELAY / 1000,
-      ease: [0.4, 0, 0.2, 1], // Custom easeIn curve
+export function buildCardAnimationVariants(timing?: {
+  CHECKING_DELAY?: number;
+  DRAW_DELAY?: number;
+  EVALUATING_DELAY?: number;
+}) {
+  const checkingDelay = timing?.CHECKING_DELAY ?? GAME_TIMING.CHECKING_DELAY;
+  const drawDelay = timing?.DRAW_DELAY ?? GAME_TIMING.DRAW_DELAY;
+  const evaluatingDelay = timing?.EVALUATING_DELAY ?? GAME_TIMING.EVALUATING_DELAY;
+
+  return {
+    idle: {
+      scale: 1,
+      y: 0,
+      x: 0,
+      rotate: 0,
+      opacity: 1,
     },
-  },
-  exiting: {
-    scale: 0.9,
-    x: 0,
-    y: 0,
-    rotate: 0,
-    opacity: 1,
-    transition: {
-      duration: GAME_TIMING.EVALUATING_DELAY / 1000,
-      type: 'spring',
-      stiffness: 80,
-      damping: 15,
+    selected: {
+      scale: 1.05,
+      y: -10,
+      x: 0,
+      rotate: 0,
+      opacity: 1,
     },
-  },
-  inHand: {
-    scale: 1,
-    y: 0,
-    x: 0,
-    rotate: 0,
-    opacity: 1,
-  },
-} as const;
+    autoPlaying: buildAutoPlayingAnimation(checkingDelay),
+    entering: {
+      scale: 1,
+      y: 0,
+      x: 0,
+      rotate: 0,
+      rotateY: 0,
+      opacity: 1,
+      transition: {
+        duration: drawDelay / 1000,
+        ease: [0.4, 0, 0.2, 1], // Custom easeIn curve
+      },
+    },
+    exiting: {
+      scale: 0.9,
+      x: 0,
+      y: 0,
+      rotate: 0,
+      opacity: 1,
+      transition: {
+        duration: evaluatingDelay / 1000,
+        type: 'spring' as const,
+        stiffness: 80,
+        damping: 15,
+      },
+    },
+    inHand: {
+      scale: 1,
+      y: 0,
+      x: 0,
+      rotate: 0,
+      opacity: 1,
+    },
+  };
+}
+
+/**
+ * Default card animation variants using static GAME_TIMING
+ * @deprecated Use buildCardAnimationVariants() for dynamic timing
+ */
+export const cardAnimationVariants = buildCardAnimationVariants();
 
 /**
  * Initial position for cards being drawn from the deck
@@ -94,31 +114,37 @@ export const cardDrawInitialState = {
 };
 
 /**
- * Timing for the blue card back overlay during flip
+ * Build timing for the blue card back overlay during flip
  * Flip happens at the midpoint of DRAW_DELAY animation
  */
-export const CARD_FLIP_TIMING = {
-  get blueBackDelay() {
-    return (GAME_TIMING.DRAW_DELAY / 2) / 1000; // Midpoint in seconds
-  },
-  blueBackDuration: 0.001, // Instant hide (seconds)
-  get faceFadeDelay() {
-    return (GAME_TIMING.DRAW_DELAY / 2) / 1000; // Midpoint in seconds
-  },
-  faceFadeDuration: 0.1, // Quick fade in (seconds)
-};
+export function buildCardFlipTiming(drawDelay: number = GAME_TIMING.DRAW_DELAY) {
+  return {
+    blueBackDelay: (drawDelay / 2) / 1000, // Midpoint in seconds
+    blueBackDuration: 0.001, // Instant hide (seconds)
+    faceFadeDelay: (drawDelay / 2) / 1000, // Midpoint in seconds
+    faceFadeDuration: 0.1, // Quick fade in (seconds)
+  };
+}
+
+/**
+ * Default card flip timing using static GAME_TIMING
+ * @deprecated Use buildCardFlipTiming() for dynamic timing
+ */
+export const CARD_FLIP_TIMING = buildCardFlipTiming();
 
 /**
  * Build amber overlay animation config that matches autoPlaying timing
- * Same phase durations: Lift (400ms) → Settle (300ms) → Hold (remainder)
+ * Same phase percentages: Lift (20%) → Settle (15%) → Hold (65%)
  */
-export function buildAmberOverlayConfig() {
-  const totalDuration = GAME_TIMING.CHECKING_DELAY; // in ms
-  const liftDuration = 400;
-  const settleDuration = 300;
+export function buildAmberOverlayConfig(checkingDelay: number = GAME_TIMING.CHECKING_DELAY) {
+  const totalDuration = checkingDelay; // in ms
 
-  const liftEnd = liftDuration / totalDuration;
-  const settleEnd = (liftDuration + settleDuration) / totalDuration;
+  // Proportional phase percentages (matching autoPlaying animation)
+  const liftPercent = 0.20;
+  const settlePercent = 0.15;
+
+  const liftEnd = liftPercent;
+  const settleEnd = liftPercent + settlePercent;
 
   return {
     opacity: [0, 0.45, 0.4, 0.4],

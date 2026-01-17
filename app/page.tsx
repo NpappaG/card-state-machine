@@ -6,6 +6,7 @@ import { Card } from "./components/card/Card";
 import { DeckStack } from "./components/deck/DeckStack";
 import { DiscardStack } from "./components/discard/DiscardStack";
 import { StateTreeVisualizer } from "./components/StateTreeVisualizer";
+import { SpeedControls } from "./components/SpeedControls";
 import { LayoutGroup, motion } from "framer-motion";
 import React, { useState } from "react";
 
@@ -183,8 +184,14 @@ export default function GamePage() {
   // Render active game
   return (
     <LayoutGroup>
-      {/* State Tree Visualizer - Fixed to right side */}
-      <StateTreeVisualizer currentState={game.snapshot.value} game={game} />
+      {/* Bottom right controls */}
+      <div className="fixed right-4 bottom-4 z-50 flex items-end gap-4">
+        {/* Speed Controls - Left of visualizer */}
+        <SpeedControls />
+
+        {/* State Tree Visualizer - Right side */}
+        <StateTreeVisualizer currentState={game.snapshot.value} game={game} />
+      </div>
 
       <div className="flex min-h-screen flex-col bg-gradient-to-br from-green-700 to-green-900 p-4">
         {/* Header with timer and game status */}

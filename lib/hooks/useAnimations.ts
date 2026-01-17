@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { GAME_TIMING } from '@/lib/constants';
 import type { UseCardGameReturn } from './useCardGame';
 
 /**
@@ -9,12 +8,15 @@ import type { UseCardGameReturn } from './useCardGame';
  *
  * Coordinates UI animations with state machine timing delays to ensure
  * animations complete before state transitions occur. Animation durations
- * should be equal to or shorter than their corresponding GAME_TIMING values.
+ * should be equal to or shorter than their corresponding timing values.
  */
 export function useAnimations(game: UseCardGameReturn) {
   const [lastPlayedCards, setLastPlayedCards] = useState<string[]>([]);
   const [lastDrawnCard, setLastDrawnCard] = useState<string | null>(null);
   const [autoPlayingCards, setAutoPlayingCards] = useState<string[]>([]);
+
+  // Get dynamic timing from game machine context
+  const timing = game.snapshot.context.timing;
 
   // Detect auto-play during checkingCards phase
   useEffect(() => {
@@ -56,20 +58,20 @@ export function useAnimations(game: UseCardGameReturn) {
     if (!game.isEvaluating && lastPlayedCards.length > 0) {
       const timeout = setTimeout(() => {
         setLastPlayedCards([]);
-      }, GAME_TIMING.EVALUATING_DELAY);
+      }, timing.EVALUATING_DELAY);
       return () => clearTimeout(timeout);
     }
-  }, [game.isEvaluating, lastPlayedCards.length]);
+  }, [game.isEvaluating, lastPlayedCards.length, timing.EVALUATING_DELAY]);
 
   // Clear drawn card after animation
   useEffect(() => {
     if (!game.isDrawing && lastDrawnCard) {
       const timeout = setTimeout(() => {
         setLastDrawnCard(null);
-      }, GAME_TIMING.DRAW_DELAY);
+      }, timing.DRAW_DELAY);
       return () => clearTimeout(timeout);
     }
-  }, [game.isDrawing, lastDrawnCard]);
+  }, [game.isDrawing, lastDrawnCard, timing.DRAW_DELAY]);
 
   return {
     // State-based animation flags
@@ -78,12 +80,12 @@ export function useAnimations(game: UseCardGameReturn) {
     shouldAnimateCardDraw: game.isDrawing,
     shouldAnimateTurnChange: game.isChangingTurn,
 
-    // Animation timing (match these in Framer Motion components)
+    // Animation timing (dynamically pulled from game machine context)
     timing: {
-      checking: GAME_TIMING.CHECKING_DELAY,
-      cardPlay: GAME_TIMING.EVALUATING_DELAY, // Used for both auto-play and manual play
-      cardDraw: GAME_TIMING.DRAW_DELAY,
-      turnChange: GAME_TIMING.TURN_CHANGE_DELAY,
+      checking: timing.CHECKING_DELAY,
+      cardPlay: timing.EVALUATING_DELAY, // Used for both auto-play and manual play
+      cardDraw: timing.DRAW_DELAY,
+      turnChange: timing.TURN_CHANGE_DELAY,
     },
 
     // Recently played cards (for exit animations)
