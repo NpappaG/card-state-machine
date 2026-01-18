@@ -44,7 +44,10 @@ export function useCardGame() {
   // Derived state
   const currentPlayer = snapshot.context.players[snapshot.context.currentPlayerIndex];
   const topDiscard = snapshot.context.discardPile[snapshot.context.discardPile.length - 1];
-  const timerPercent = (snapshot.context.timerRemainingMs / 180000) * 100;
+  const roundDurationMs = snapshot.context.timing.ROUND_DURATION_MS;
+  const timerPercent = (snapshot.context.timerRemainingMs / roundDurationMs) * 100;
+
+  const isSetupState = snapshot.matches('setup');
 
   return {
     // Core machine interface
@@ -69,8 +72,8 @@ export function useCardGame() {
     roundScores: snapshot.context.roundScores,
 
     // State matchers (for conditional rendering)
-    isIdle: snapshot.matches('idle'),
-    isSetup: snapshot.matches('setup'),
+    isIdle: isSetupState,
+    isSetup: isSetupState,
     isRoundActive: snapshot.matches('roundActive'),
     isCheckingCards: snapshot.matches({ roundActive: { playerTurn: 'checkingCards' } }),
     isSelecting: snapshot.matches({ roundActive: { playerTurn: 'selecting' } }),

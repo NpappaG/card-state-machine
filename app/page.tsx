@@ -68,8 +68,8 @@ export default function GamePage() {
     return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
-  // Render idle state (game start screen)
-  if (game.isIdle) {
+  // Render setup state (game start screen)
+  if (game.isSetup) {
     return (
       <>
         {/* Bottom right controls */}

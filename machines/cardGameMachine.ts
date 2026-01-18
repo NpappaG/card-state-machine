@@ -3,10 +3,10 @@ import type { GameContext, GameEvent } from "@/lib/types";
 import * as Logic from "./cardGameLogic";
 import { GAME_TIMING } from "@/lib/constants";
 
-// Timer actor using fromCallback
+// Timer actor using fromCallback - got this idea from Xstate examples
 const timerLogic = fromCallback(({ sendBack }) => {
   const interval = setInterval(() => {
-    sendBack({ type: "timer.tick" });
+    sendBack({ type: "timer.tick", timestamp: performance.now() });
   }, 1000); // Tick every second
 
   return () => clearInterval(interval);
@@ -18,6 +18,11 @@ type InternalEvent =
   | { type: "SELECTING_REQUIRED" }
   | { type: "DRAW_REQUIRED" }
   | { type: "timing.update"; timing: GameContext['timing'] };
+
+const startGameTransition = {
+  target: "roundActive",
+  actions: ["initializeGame", "startTimer"],
+} as const;
 
 export const cardGameMachine = setup({
   types: {
@@ -68,7 +73,7 @@ export const cardGameMachine = setup({
 
     updateTimer: assign(({ context, event }) => {
       if (event.type !== "timer.tick") return context;
-      return Logic.updateTimerReducer(context);
+      return Logic.updateTimerReducer(context, event.timestamp);
     }),
 
     calculateScores: assign(({ context }) =>
@@ -98,8 +103,9 @@ export const cardGameMachine = setup({
     timerExpired: ({ context }) => Logic.timerExpired(context),
   },
 }).createMachine({
+  /** @xstate-layout N4IgpgJg5mDOIC5QGMCGAnCBxVBbMAxAC4CWuJAdlAHQCuADhKkWANoAMAuoqPQPawSpPhR4gAHonYAaEAE8pAX0Wy0mHPmro+tChACCyUgDdCpfOmqlkAaw7ckIfoOGjHkhDPlKVINdjwwLR09QxNCezFnIRIRMQ8vBU9lVQwAzW1dAyMSU2p6ABtUOTB0ABVadApqZAALMFtKKABhNNgCcVgiZiDUADMWdAAKOoabJoARMCK5AEoCfw0gzNCcvMLi0oqqmvrGqlbMWEjHaNd4xABGagBWG4BmABYANnuATnvLt8fHm4Amdg3WRJAC07Gofxuvze7D+AA57nCXpdHpdnik-GklsEsmFckENiVypVqugwKgIHIynwwgQAEoAeQAqgA5CYAfQAomyTrwBDE4u4pMCfKl1IEcatwvkZlsSVpyZTqbT9Eyygz2QAFAAy+gAmrynPzzkKENc7k9Xh8vj9-oCRQgwRCoTcYfDEcjUejfIsJStstLCXKdmSKVSaUYCABlTnaznNMoASRZWHZdM5AEUmYn0xNDWdYm5QB5zQ8Xu9Pt9fgCgd5HeDIdDYQikc8UWiMb6MiEA-iZZtiSHFeHaRM6foAOppzPZ3P542Fi5m25lq2V201h1Oxuu5setteztYv09vHrWWD6qwaYNUhUBZpajXgq3+cuRem0uWis26v2uvbi6botp6HY+se3a4msBIXtsV43jk97+NQEBwAhRBvgKRYSFcK7ftaVZ2rWoINkBe6tu23piukyyntB-ZEnBT7oU0D6YAxmEmsWVxvH81BvM87BtuwbxwsJcJiQ6lxCfc1ASQA7H8yKQs8byXDcR7ipBUp9kGl4oegqAAO6sZ03QsNQ-SDEMECGUZUwzPMXa0VBgawfKtnGU0nEftxy4WuWBEbv+JHOk27oUYe4FaS5OnngOTFgMYqAFLQzCmV0PSWQMpRDElKVpXeUAOcUTkQbFvbxYx8r5al6VUD5gp+YkoqYjFkqVTBCU1cldVFR0mUWVZuW1YVkzTKVbE0R1Z5ddVOyjfVUCsJcDh8u+TU4Wa8lvNQ9z3H8fzSfc7A-H8Dp-Cde13Jc8k3Jcnxwg9p2adN-qzQxwbVHUqBUE0cEDeZvQ5cMRAks0tS-TAJVzFN2LvfRelMT9f1UHBjXYR4N1yadCLVpch0iVJby7bxzyQuw7BifJ7D3N6vgUHwqHwI4zlRAum0eCCKKPFunzgr8LxU1Crz3Dtr3YteYP0OzG2Y4gIIvNQzyPPJ8lon8qmIvJYu8wBvxyTczwSRTUI8-cEsnq5+Ky1hS4gt81A-M8DyCcbgJQnCW6HXxasCepin+98GnRW9dFud1VS21xW2K88TsvK7Qlwh7jxewBcLyfxfxvK6OuvI8h1wm8lvaZ1n36aM+wtG00e+VtfyKXtOuIgCaffCrDqFzc-GugiB6qY3fylxVH1I-KoZKhGRB15ziBp3xPyws88mZ43uMOq6PcHepNzyeT8mqwTI8zYj7k7M+t5NLP8sIE8PcokbMKXGJ7Av3rSRq481Dvy88LFzTY2J8EYR3mtUTyJkqA3yXJaJ2JNBJIhhDcBEe8HS8R7rTe6+9M7-ChI8YB4ddLn2qItIq0DTRHT4kdZ6iJPg60eLTKSdNv5vzuncXiqIjoEOtlVL6uwob-RJOQvyj05KrwYbxVeSk3hSRflnD4h0X5PSplTbhehOR6GEbHASUlVbf0Ph6LegJi4h2UEAA */
   id: "cardGame",
-  initial: "idle",
+  initial: "setup",
   context: {
     players: [],
     currentPlayerIndex: 0,
@@ -123,12 +129,9 @@ export const cardGameMachine = setup({
     },
   },
   states: {
-    idle: {
+    setup: {
       on: {
-        "game.start": {
-          target: "roundActive",
-          actions: ["initializeGame", "startTimer"],
-        },
+        "game.start": startGameTransition,
       },
     },
 
@@ -226,10 +229,7 @@ export const cardGameMachine = setup({
     roundEnd: {
       entry: "calculateScores",
       on: {
-        "game.start": {
-          target: "roundActive",
-          actions: ["initializeGame", "startTimer"],
-        },
+        "game.start": startGameTransition,
       },
     },
   },

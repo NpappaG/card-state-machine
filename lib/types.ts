@@ -52,6 +52,6 @@ export type GameEvent =
   | { type: 'card.select'; cardId: string }
   | { type: 'card.deselect'; cardId: string }
   | { type: 'card.play' }
-  | { type: 'timer.tick' }
+  | { type: 'timer.tick'; timestamp: number }
   | { type: 'game.newRound' }
   | { type: 'game.over' };

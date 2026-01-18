@@ -358,8 +358,8 @@ export function advanceTurnReducer(context: GameContext): GameContext {
 /**
  * Update the timer based on elapsed time.
  */
-export function updateTimerReducer(context: GameContext): GameContext {
-  const elapsed = performance.now() - context.timerStartMs;
+export function updateTimerReducer(context: GameContext, timestamp: number): GameContext {
+  const elapsed = timestamp - context.timerStartMs;
   const remaining = Math.max(0, context.timing.ROUND_DURATION_MS - elapsed);
 
   return {

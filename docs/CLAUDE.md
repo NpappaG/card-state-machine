@@ -16,7 +16,7 @@ This is a state machine architecture for a turn-based card game system using XSt
 ## Development Commands
 
 ```bash
-# Install dependencies (already installed)
+# Install dependencies
 bun install
 
 # Run development server
@@ -27,6 +27,12 @@ bun run build
 
 # Lint code
 bun run lint
+
+# Run all tests
+bun test tests
+
+# Run specific test file
+bun test tests/cardGameMachine.test.ts
 ```
 
 ## Game Rules
@@ -230,19 +236,18 @@ card-state-machine/
 
 ### ✅ Completed
 - **State Machine**: Fully implemented with all game logic
-  - Setup phase: Deal 3 cards per player, 1 to discard pile, random first player
-  - Turn flow: checkingCards → selecting/auto-play/drawing → evaluating → changingTurn
+  - Setup phase: Deal 5 cards per player, 1 to discard pile, random first player
+  - Turn flow: checkingCards → readyToAct → selecting/auto-play/drawing → evaluating → changingTurn
   - Timer: 3-minute countdown with `fromCallback` actor
-  - Win conditions: Empty hand or timer expires
+  - Win conditions: Empty hand, timer expires, or deck exhausted
   - Score calculation at round end
 - **Type Safety**: Complete TypeScript types for all entities
-- **Pure Actions**: All context updates are immutable
+- **Pure Actions**: All context updates are immutable via pure functions in `cardGameLogic.ts`
 - **Modern Conventions**: Dot notation events, `performance.now()` timing
-
-### 🚧 In Progress / Next Steps
-- **UI Components**: Build React components to visualize and play the game
-- **Hooks**: Create `useCardGame` hook to connect machine to React
-- **Visual Polish**: Animations, transitions, responsive design
+- **UI Components**: Fully implemented React components with Framer Motion animations
+- **Hooks**: `useCardGame` hook provides state matchers and convenience methods
+- **Visual Polish**: Complete with card animations, state visualizer, and speed controls
+- **Dynamic Timing**: Runtime-adjustable delays via SpeedControls (slow/normal/fast)
 
 ## Architectural Principles
 
@@ -252,3 +257,175 @@ card-state-machine/
 - Hierarchy over parallel states (unless concerns are truly orthogonal)
 - Single source of truth: Context holds all game state
 - Turn transitions are explicit with `changingTurn` state (for animation window)
+
+## Timing Architecture: The Critical Design Decision
+
+**Core Principle:** The state machine is the clock. Animations are subordinate to state machine delays, not the other way around.
+
+All timing is defined in `/lib/constants.ts` via `GAME_TIMING`. State machine delays (`after: { ... }`) create fixed time windows, and UI animations must fit within those windows. This is **time-based coordination** rather than event-driven coordination.
+
+### Why This Approach
+
+- **Simple and maintainable** - No complex animation event plumbing
+- **Deterministic timing** - Predictable, testable behavior
+- **Clean separation** - State machine doesn't depend on UI layer
+- **Good fit for games** - Fixed-duration animations are acceptable
+
+### How It Works
+
+State machine delays define state duration:
+```typescript
+checkingCards: {
+  after: {
+    checkingDelay: "readyToAct",  // Uses context.timing.CHECKING_DELAY
+  }
+}
+```
+
+Animations calculate proportional keyframes:
+```typescript
+const totalDuration = GAME_TIMING.CHECKING_DELAY; // 1000ms
+const liftDuration = 400;   // Fixed phase
+const liftEnd = liftDuration / totalDuration;  // 0.4 (40%)
+
+// If CHECKING_DELAY changes to 2000ms, liftEnd becomes 0.2 (20%)
+```
+
+See `/lib/animations/cardAnimations.ts` for implementation examples.
+
+### Dynamic Timing System
+
+The app includes `SpeedControls` that allow runtime adjustment:
+- **Slow**: All delays × 2
+- **Normal**: Default `GAME_TIMING` values
+- **Fast**: All delays × 0.5
+
+**Flow:** SpeedControls → TimingContext → useCardGame (useEffect) → state machine context
+
+Timing values flow through React Context and sync to the state machine via `timing.update` event.
+
+### Known Trade-off: Topline Delay
+
+The `checkingCards` state has a 1000ms delay that applies to ALL branches:
+- **Auto-play:** ✅ Needs the delay for amber highlight animation
+- **Manual selection:** ⚠️ Adds pause before user can click
+- **Drawing:** ⚠️ Adds pause before draw animation
+
+**Why it's acceptable:**
+- Simplifies state machine structure
+- Round timer continues (adds time pressure)
+- Auto-play animation has predictable window
+
+**Potential optimization:** Move delay into `autoPlaying` sub-state for more responsive manual actions.
+
+### Alternative Approaches NOT Used
+
+1. **Event-driven animations** (animations send `ANIMATION_COMPLETE` events)
+   - More complex
+   - Couples UI to state machine
+   - Allows variable-duration animations
+
+2. **Invoked animation actors** (XState owns animation lifecycle)
+   - Tighter coupling
+   - More plumbing required
+
+Current approach is simpler and sufficient for this use case.
+
+## File Organization
+
+```
+/machines/
+  cardGameMachine.ts   - State machine definition (setup, states, transitions)
+  cardGameLogic.ts     - Pure game logic functions (guards, reducers)
+
+/lib/
+  constants.ts         - GAME_TIMING and other constants
+  types.ts             - TypeScript types (Card, Player, GameContext, GameEvent)
+  /hooks/
+    useCardGame.ts     - Primary hook for accessing game state
+    useAnimations.ts   - Animation timing helpers
+  /contexts/
+    TimingContext.tsx  - React Context for dynamic timing configuration
+  /animations/
+    cardAnimations.ts  - Framer Motion animation builders (proportional timing)
+  /utils/
+    scoreCalculator.ts - Pure scoring logic
+
+/app/
+  page.tsx             - Main game page
+  layout.tsx           - Root layout with TimingProvider
+  /components/
+    StateTreeVisualizer.tsx - Visual state machine debugger
+    SpeedControls.tsx       - Runtime timing controls
+    /card/                  - Card display components
+    /deck/                  - Deck stack component
+    /discard/               - Discard pile component
+
+/tests/
+  cardGameMachine.test.ts - State machine integration tests
+  cardGameLogic.test.ts   - Pure logic unit tests
+
+/docs/
+  CLAUDE.md           - This file
+  XSTATE_DOCS.md      - XState v5 reference
+  ARCHITECTURE.md     - Detailed architecture decisions
+  XSTATE_PATTERNS.md  - Common XState patterns
+```
+
+## Common Development Patterns
+
+### Adding a New State
+
+1. Update state machine in `machines/cardGameMachine.ts`
+2. Add pure logic functions to `machines/cardGameLogic.ts` if needed
+3. Export state matcher from `useCardGame.ts`:
+   ```typescript
+   isNewState: snapshot.matches({ roundActive: { playerTurn: 'newState' } })
+   ```
+4. Use matcher in components for conditional rendering
+
+### Adding a New Event
+
+1. Add event type to `GameEvent` in `lib/types.ts`
+2. Add event handler in appropriate state in `machines/cardGameMachine.ts`
+3. Components send event via `send({ type: 'event.name', ...payload })`
+
+### Modifying Timing
+
+1. Update `GAME_TIMING` in `lib/constants.ts`
+2. Ensure animations in `lib/animations/cardAnimations.ts` fit within new window
+3. Test with SpeedControls UI at slow/normal/fast speeds
+
+### Animation Best Practices
+
+- Animations must complete BEFORE their state's delay expires
+- Use proportional timing math (calculate keyframes from `GAME_TIMING`)
+- Never hardcode animation durations that don't reference `GAME_TIMING`
+- Test at all speed settings using SpeedControls
+
+### Testing Pure Logic
+
+```typescript
+import * as Logic from '@/machines/cardGameLogic';
+
+test('should allow playing matching card', () => {
+  const context = createMockContext({ /* ... */ });
+  expect(Logic.canPlaySelectedCards(context)).toBe(true);
+});
+```
+
+### Testing State Machine
+
+```typescript
+import { createActor } from 'xstate';
+import { cardGameMachine } from '@/machines/cardGameMachine';
+
+test('should transition to selecting when multiple cards match', async () => {
+  const actor = createActor(cardGameMachine).start();
+  actor.send({ type: 'game.start', playerCount: 2 });
+  await waitFor(actor, (state) =>
+    state.matches({ roundActive: { playerTurn: 'selecting' } })
+  );
+  expect(actor.getSnapshot().context.players[0].hand).toHaveLength(5);
+});
+```

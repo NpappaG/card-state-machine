@@ -1,5 +1,6 @@
 import { test, expect, describe } from 'bun:test';
 import * as Logic from '../machines/cardGameLogic';
+import { GAME_TIMING } from '../lib/constants';
 import type { Card, GameContext, Player, Rank, Suit } from '../lib/types';
 
 // ============================================================================
@@ -45,6 +46,13 @@ function makeContext(overrides: Partial<GameContext> = {}): GameContext {
     timerStartMs: overrides.timerStartMs ?? 0,
     timerRemainingMs: overrides.timerRemainingMs ?? 180000,
     roundScores: overrides.roundScores ?? {},
+    timing: overrides.timing ?? {
+      CHECKING_DELAY: GAME_TIMING.CHECKING_DELAY,
+      DRAW_DELAY: GAME_TIMING.DRAW_DELAY,
+      EVALUATING_DELAY: GAME_TIMING.EVALUATING_DELAY,
+      TURN_CHANGE_DELAY: GAME_TIMING.TURN_CHANGE_DELAY,
+      ROUND_DURATION_MS: GAME_TIMING.ROUND_DURATION_MS,
+    },
   };
 }
 
@@ -851,7 +859,7 @@ describe('updateTimerReducer', () => {
       timerRemainingMs: 180000,
     });
 
-    const updatedContext = Logic.updateTimerReducer(originalContext);
+    const updatedContext = Logic.updateTimerReducer(originalContext, startTime);
 
     expect(updatedContext).not.toBe(originalContext);
     expect(updatedContext.timerRemainingMs).toBeLessThan(180000);
@@ -865,7 +873,7 @@ describe('updateTimerReducer', () => {
       timerRemainingMs: 180000,
     });
 
-    const updatedContext = Logic.updateTimerReducer(context);
+    const updatedContext = Logic.updateTimerReducer(context, startTime);
 
     expect(updatedContext.timerRemainingMs).toBe(0);
   });

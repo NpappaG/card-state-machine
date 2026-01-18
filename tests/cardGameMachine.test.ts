@@ -1,6 +1,7 @@
 import { test, expect } from 'bun:test';
 import { createActor } from 'xstate';
 import { cardGameMachine } from '../machines/cardGameMachine';
+import { GAME_TIMING } from '../lib/constants';
 import { determineNextAction } from '../machines/cardGameLogic';
 import type { Card, GameContext, Player, Rank, Suit } from '../lib/types';
 
@@ -43,6 +44,13 @@ function buildActor(value: any, context: Partial<GameContext>) {
     timerStartMs: context.timerStartMs ?? 0,
     timerRemainingMs: context.timerRemainingMs ?? 180000,
     roundScores: context.roundScores ?? {},
+    timing: context.timing ?? {
+      CHECKING_DELAY: GAME_TIMING.CHECKING_DELAY,
+      DRAW_DELAY: GAME_TIMING.DRAW_DELAY,
+      EVALUATING_DELAY: GAME_TIMING.EVALUATING_DELAY,
+      TURN_CHANGE_DELAY: GAME_TIMING.TURN_CHANGE_DELAY,
+      ROUND_DURATION_MS: GAME_TIMING.ROUND_DURATION_MS,
+    },
   };
 
   const snapshot = cardGameMachine.resolveState({
@@ -138,10 +146,10 @@ test('card.deselect removes card from selection', () => {
 // resolveState to create snapshots. These tests focus on event-driven
 // transitions that we can reliably observe.
 
-test('idle transitions to roundActive on game.start event', () => {
+test('setup transitions to roundActive on game.start event', () => {
   const actor = createActor(cardGameMachine).start();
 
-  expect(actor.getSnapshot().value).toBe('idle');
+  expect(actor.getSnapshot().value).toBe('setup');
 
   actor.send({ type: 'game.start', playerCount: 2 });
 
@@ -257,6 +265,13 @@ test('determineNextAction returns ROUND_END when deck empty and no matches', () 
     timerStartMs: 0,
     timerRemainingMs: 180000,
     roundScores: {},
+    timing: {
+      CHECKING_DELAY: GAME_TIMING.CHECKING_DELAY,
+      DRAW_DELAY: GAME_TIMING.DRAW_DELAY,
+      EVALUATING_DELAY: GAME_TIMING.EVALUATING_DELAY,
+      TURN_CHANGE_DELAY: GAME_TIMING.TURN_CHANGE_DELAY,
+      ROUND_DURATION_MS: GAME_TIMING.ROUND_DURATION_MS,
+    },
   };
 
   expect(determineNextAction(context as GameContext)).toBe('ROUND_END');

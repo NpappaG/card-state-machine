@@ -62,11 +62,10 @@ We chose **Option B** because:
 The timing constants live in `lib/constants.ts`:
 ```typescript
 export const GAME_TIMING = {
-  CHECKING_DELAY: 300,        // Before checking playable cards
-  AUTO_PLAY_DELAY: 600,       // After auto-playing card
-  DRAW_DELAY: 500,            // After drawing card
+  CHECKING_DELAY: 1000,       // Before checking playable cards
+  DRAW_DELAY: 1155,           // After drawing card
   EVALUATING_DELAY: 400,      // Before evaluating win conditions
-  TURN_CHANGE_DELAY: 500,     // During turn transition
+  TURN_CHANGE_DELAY: 400,     // During turn transition
   ROUND_DURATION_MS: 180000,  // 3-minute round timer
 } as const;
 ```
@@ -89,12 +88,16 @@ checkingCards: {
 ```typescript
 checkingCards: {
   after: {
-    [GAME_TIMING.CHECKING_DELAY]: {  // Waits 300ms
-      always: [
-        { guard: 'hasSingleValidCard', target: 'evaluating', actions: 'autoPlaySingleCard' },
-        // ...
-      ],
-    },
+    [GAME_TIMING.CHECKING_DELAY]: 'readyToAct', // Waits 1000ms
+  },
+},
+readyToAct: {
+  entry: 'decideNextAction',
+  on: {
+    ROUND_END: '#cardGame.roundEnd',
+    AUTO_PLAY: { target: 'evaluating', actions: 'autoPlaySingleCard' },
+    SELECTING_REQUIRED: 'selecting',
+    DRAW_REQUIRED: 'drawing',
   },
 },
 ```
@@ -105,23 +108,25 @@ checkingCards: {
 
 ```
 Player plays card
-    ↓
-selecting → evaluating (waits 400ms)
-    ↓
-changingTurn (waits 500ms)
-    ↓
-checkingCards (waits 300ms)
-    ↓
+    |
+selecting -> evaluating (waits 400ms)
+    |
+changingTurn (waits 400ms)
+    |
+checkingCards (waits 1000ms)
+    |
+readyToAct (decideNextAction)
+    |
 [auto-play detected]
-    ↓
+    |
 evaluating (waits 400ms, card flies to discard)
-    ↓
-changingTurn (waits 500ms)
-    ↓
-checkingCards (next player)
+    |
+changingTurn (waits 400ms)
+    |
+checkingCards (next player, waits 1000ms)
 ```
 
-**Total time for one auto-play**: ~1.6 seconds (vs. instant before).
+**Total time for one auto-play**: about 1.8 seconds with current defaults (checking + evaluating + turn change).
 
 ### Animation Coordination
 

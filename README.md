@@ -45,7 +45,7 @@ This loop repeats in player order until a hand empties or the timer expires.
 ### State Chart Outline
 
 ```
-idle
+setup
   └─ 'game.start' (actions: initializeGame + startTimer) → roundActive
 
 roundActive (invoke timer)
@@ -172,7 +172,7 @@ This would make the game more responsive while maintaining auto-play animation q
 - `roundScores`: Final scores recorded at round end
 
 ### States
-- `idle`: Await `game.start`
+- `setup`: Await `game.start`
 - `roundActive`
   - `playerTurn`
     - `checkingCards`: delay window before acting
@@ -184,16 +184,27 @@ This would make the game more responsive while maintaining auto-play animation q
 - `roundEnd`: Scores calculated, wait for restart
 
 ### Events
-- External: `game.start`, `card.select`, `card.deselect`, `card.play`, `timer.tick`
-- Internal (raised): `ROUND_END`, `AUTO_PLAY`, `SELECTING_REQUIRED`, `DRAW_REQUIRED`
+
+**External Events** (from outside the machine):
+- `game.start` - User starts a new game/round
+- `card.select`, `card.deselect` - User clicks cards in the UI
+- `card.play` - User presses SPACE or "Play Selected" button
+- `timer.tick` - Timer actor sends every second with timestamp
+
+**Internal Events** (machine talking to itself via `raise()`):
+- `ROUND_END` - Machine detected round should end
+- `AUTO_PLAY` - Machine detected exactly one playable card
+- `SELECTING_REQUIRED` - Machine detected multiple playable cards
+- `DRAW_REQUIRED` - Machine detected no playable cards
+
+**Why both?** The `readyToAct` state is a decision point where the machine examines context and raises an internal event to route itself. External events cross the boundary from user/timer into the machine. Internal events are the machine's way of saying "based on my current state, here's where I should go next" without requiring outside input.
 
 ### Guards
 - `canPlaySelectedCards`: Exactly one selected card matches top discard
 - `currentPlayerHasNoCards`: Active hand is empty
 - `timerExpired`: Timer reached zero
 
-### Transitions (highlights)
-- `idle` --`game.start / initializeGame + startTimer`--> `roundActive`
+- `setup` --`game.start / initializeGame + startTimer`--> `roundActive`
 - `checkingCards` --after `CHECKING_DELAY`--> `readyToAct`
 - `readyToAct` --`AUTO_PLAY / autoPlaySingleCard`--> `evaluating`
 - `readyToAct` --`SELECTING_REQUIRED`--> `selecting`

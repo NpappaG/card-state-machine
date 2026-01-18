@@ -1,71 +1,71 @@
-import { assign, fromCallback, setup } from "xstate";
+import { assign, fromCallback, setup } from 'xstate';
 
 export const timerMachine = setup({
   actors: {
     ticks: fromCallback(({ sendBack }) => {
       const interval = setInterval(() => {
-        sendBack({ type: "TICK" });
+        sendBack({ type: 'TICK' });
       }, 1000);
       return () => clearInterval(interval);
-    }),
-  },
+    })
+  }
 }).createMachine({
   types: {} as {
     events:
-      | { type: "start" }
-      | { type: "stop" }
-      | { type: "reset" }
-      | { type: "minute" }
-      | { type: "second" }
-      | { type: "TICK" };
+      | { type: 'start' }
+      | { type: 'stop' }
+      | { type: 'reset' }
+      | { type: 'minute' }
+      | { type: 'second' }
+      | { type: 'TICK' };
   },
   context: {
-    seconds: 0,
+    seconds: 0
   },
-  initial: "stopped",
+  initial: 'stopped',
   states: {
     stopped: {
       on: {
         start: {
           guard: ({ context }) => context.seconds > 0,
-          target: "running",
+          target: 'running'
         },
         minute: {
           actions: assign({
-            seconds: ({ context }) => context.seconds + 60,
-          }),
+            seconds: ({ context }) => context.seconds + 60
+          })
         },
         second: {
           actions: assign({
-            seconds: ({ context }) => context.seconds + 1,
-          }),
-        },
-      },
+            seconds: ({ context }) => context.seconds + 1
+          })
+        }
+      }
     },
     running: {
       invoke: {
-        src: "ticks",
+        src: 'ticks'
       },
       on: {
-        stop: "stopped",
+        stop: 'stopped',
         TICK: {
           actions: assign({
-            seconds: ({ context }) => context.seconds - 1,
-          }),
-        },
+            seconds: ({ context }) => context.seconds - 1
+          })
+        }
       },
       always: {
         guard: ({ context }) => context.seconds === 0,
-        target: "stopped",
-      },
-    },
+        target: 'stopped'
+      }
+    }
   },
   on: {
     reset: {
       guard: ({ context }) => context.seconds > 0,
       actions: assign({
-        seconds: 0,
-      }),
-    },
-  },
+        seconds: 0
+      })
+    }
+  }
 });

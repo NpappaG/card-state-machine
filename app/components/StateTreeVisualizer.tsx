@@ -79,7 +79,6 @@ export function StateTreeVisualizer({ currentState, game }: StateTreeVisualizerP
           </div>
 
           <div className="flex flex-col gap-0.5">
-            <StateNode name="idle" isActive={isInState('idle')} />
             <StateNode name="setup" isActive={isInState('setup')} />
 
             <StateNode name="roundActive" isActive={isInState('roundActive')} />
