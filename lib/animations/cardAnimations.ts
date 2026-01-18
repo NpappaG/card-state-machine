@@ -26,7 +26,7 @@ function buildAutoPlayingAnimation(checkingDelay: number = GAME_TIMING.CHECKING_
     transition: {
       duration: totalDuration / 1000, // Convert to seconds
       times: [0, liftEnd, settleEnd, 1], // Proportional keyframes
-      ease: [0.4, 0, 0.2, 1],
+      ease: [0.4, 0, 0.2, 1] as const,
     },
   };
 }
@@ -70,7 +70,7 @@ export function buildCardAnimationVariants(timing?: {
       transition: {
         duration: drawDelay / 1000,
         times: [0, 0.5, 0.75, 1], // Travel 50%, wriggle 50%-75%, settle 75%-100%
-        ease: [0.34, 1.56, 0.64, 1], // Elastic ease with slight overshoot
+        ease: [0.34, 1.56, 0.64, 1] as const, // Elastic ease with slight overshoot
       },
     },
     exiting: {
@@ -82,7 +82,7 @@ export function buildCardAnimationVariants(timing?: {
       transition: {
         duration: evaluatingDelay / 1000,
         times: [0, 0.4, 1],
-        ease: [0.4, 0, 0.6, 1],
+        ease: [0.4, 0, 0.6, 1] as const,
       },
     },
     inHand: {
@@ -91,6 +91,14 @@ export function buildCardAnimationVariants(timing?: {
       x: 0,
       rotate: 0,
       opacity: 1,
+    },
+    shake: {
+      x: [0, -10, 10, -10, 10, -5, 5, 0],
+      rotate: [0, -2, 2, -2, 2, -1, 1, 0],
+      transition: {
+        duration: 0.5,
+        ease: 'easeInOut' as const,
+      },
     },
   };
 }

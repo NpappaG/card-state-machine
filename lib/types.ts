@@ -31,6 +31,7 @@ export type GameContext = {
   // Timer
   timerStartMs: number;
   timerRemainingMs: number; // 180000ms (3 minutes)
+  pausedAt: number | null; // When the game was paused (null if not paused)
 
   // Scoring
   roundScores: Record<string, number>;
@@ -53,5 +54,7 @@ export type GameEvent =
   | { type: 'card.deselect'; cardId: string }
   | { type: 'card.play' }
   | { type: 'timer.tick'; timestamp: number }
+  | { type: 'round.pause' }
+  | { type: 'round.resume' }
   | { type: 'game.newRound' }
   | { type: 'game.over' };

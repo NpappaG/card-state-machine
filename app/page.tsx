@@ -2,6 +2,8 @@
 
 import { useCardGame } from "@/lib/hooks/useCardGame";
 import { useAnimations } from "@/lib/hooks/useAnimations";
+import { useToast } from "@/lib/contexts/ToastContext";
+import { canPlaySelectedCards } from "@/machines/cardGameLogic";
 import { Card } from "./components/card/Card";
 import { DeckStack } from "./components/deck/DeckStack";
 import { DiscardStack } from "./components/discard/DiscardStack";
@@ -13,11 +15,32 @@ import React, { useState } from "react";
 export default function GamePage() {
   const game = useCardGame();
   const animations = useAnimations(game);
+  const { showToast } = useToast();
   const [playerCount, setPlayerCount] = useState(2);
+  const [debugMode, setDebugMode] = useState(false);
+  const [shakingCards, setShakingCards] = useState<Set<string>>(new Set());
 
-  // Spacebar to play selected cards
+  // Trigger shake animation on specific cards
+  const triggerShake = (cardIds: string[]) => {
+    setShakingCards(new Set(cardIds));
+    setTimeout(() => setShakingCards(new Set()), 500); // Clear after animation
+  };
+
+  // Keyboard shortcuts
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape to pause/unpause
+      if (e.code === "Escape" && game.isRoundActive) {
+        e.preventDefault();
+        if (game.isPaused) {
+          game.send({ type: "round.resume" });
+        } else {
+          game.send({ type: "round.pause" });
+        }
+        return;
+      }
+
+      // Spacebar to play selected cards (only when not paused)
       if (
         e.code === "Space" &&
         game.isSelecting &&
@@ -30,7 +53,7 @@ export default function GamePage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [game.isSelecting, game.selectedCards.length]);
+  }, [game.isSelecting, game.selectedCards.length, game.isRoundActive, game.isPaused, game.send]);
 
   // Start game handler
   const handleStartGame = () => {
@@ -39,7 +62,20 @@ export default function GamePage() {
 
   // Card click handler - only one card can be selected at a time
   const handleCardClick = (cardId: string) => {
-    if (!game.isSelecting) return;
+    // If not in selecting state, show feedback
+    if (!game.isSelecting) {
+      if (game.isCheckingCards) {
+        showToast("Please wait while checking your cards...", "info");
+      } else if (game.isDrawing) {
+        showToast("Drawing a card...", "info");
+      } else if (game.isEvaluating) {
+        showToast("Evaluating the play...", "info");
+      } else if (game.isChangingTurn) {
+        showToast("Turn is changing...", "info");
+      }
+      triggerShake([cardId]);
+      return;
+    }
 
     if (game.isCardSelected(cardId)) {
       // Deselect if clicking the same card
@@ -55,9 +91,25 @@ export default function GamePage() {
 
   // Play selected cards
   const handlePlayCards = () => {
-    if (game.selectedCards.length > 0) {
-      game.send({ type: "card.play" });
+    if (game.selectedCards.length === 0) return;
+
+    // Check if the play is valid before sending
+    const isValid = canPlaySelectedCards(game.snapshot.context);
+
+    if (!isValid) {
+      // Show feedback for invalid play
+      const topCard = game.topDiscard;
+      const selectedCard = game.selectedCards[0];
+
+      if (selectedCard.rank !== topCard.rank) {
+        showToast(`${selectedCard.rank} doesn't match ${topCard.rank}!`, "error");
+        triggerShake(game.selectedCards.map(c => c.id));
+      }
+      return;
     }
+
+    // Valid play - send the event
+    game.send({ type: "card.play" });
   };
 
   // Format timer display
@@ -87,7 +139,7 @@ export default function GamePage() {
             className="bg-black/90 hover:bg-black text-white rounded-lg px-3 py-2 border border-white/20 transition-colors text-xs font-mono flex items-center gap-2"
           >
             <span>🔗</span>
-            <span>Full Code on Github</span>
+            <span>GitHub</span>
           </a>
         </div>
 
@@ -97,6 +149,9 @@ export default function GamePage() {
               Card Matching Game
             </h1>
             <p className="text-center text-gray-600">
+              Pass-and-play card game for 2-4 players
+            </p>
+            <p className="text-sm text-center text-gray-500">
               Match cards by rank. First to empty their hand wins!
             </p>
 
@@ -161,7 +216,7 @@ export default function GamePage() {
             className="bg-black/90 hover:bg-black text-white rounded-lg px-3 py-2 border border-white/20 transition-colors text-xs font-mono flex items-center gap-2"
           >
             <span>🔗</span>
-            <span>Full Code on Github</span>
+            <span>GitHub</span>
           </a>
         </div>
 
@@ -251,14 +306,24 @@ export default function GamePage() {
             </h2>
             <p className="text-sm text-gray-600">
               {game.isCheckingCards && "Checking cards..."}
-              {game.isSelecting && "Select a card to play (press Space)"}
-              {game.isDrawing && "Drawing card..."}
+              {game.isSelecting && "Select a matching card and press Space"}
+              {game.isDrawing && "Drawing a card..."}
               {game.isEvaluating && "Evaluating..."}
-              {game.isChangingTurn && "Changing turn..."}
+              {game.isChangingTurn && "Pass device to next player..."}
             </p>
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Pause Button */}
+            <button
+              onClick={() => game.send({ type: game.isPaused ? "round.resume" : "round.pause" })}
+              className="flex items-center gap-2 rounded-lg bg-gray-700 px-4 py-2 text-white hover:bg-gray-600 transition-colors"
+              aria-label={game.isPaused ? "Resume game" : "Pause game"}
+            >
+              <span className="text-xl">{game.isPaused ? "▶️" : "⏸"}</span>
+              <span className="text-sm font-medium">{game.isPaused ? "Resume" : "Pause"}</span>
+            </button>
+
             {/* Timer */}
             <div
               className={`
@@ -369,7 +434,6 @@ export default function GamePage() {
                   <div className="mb-2 flex items-center justify-between">
                     <h3 className="text-lg font-semibold text-white">
                       {player.name}
-                      {isCurrentPlayer && " (Your Turn)"}
                     </h3>
                     <span className="text-sm text-white/80">
                       {player.hand.length} cards
@@ -379,11 +443,16 @@ export default function GamePage() {
                   {/* Player's hand */}
                   <div className="flex flex-wrap gap-2">
                     {player.hand.map((card) => {
-                      const animState = animations.getCardAnimationState(
+                      let animState = animations.getCardAnimationState(
                         card.id
                       );
                       const isSelected = game.isCardSelected(card.id);
                       const canInteract = isCurrentPlayer && game.isSelecting;
+
+                      // Override with shake if this card should shake
+                      if (shakingCards.has(card.id)) {
+                        animState = 'shake';
+                      }
 
                       return (
                         <Card
@@ -403,6 +472,29 @@ export default function GamePage() {
             })}
           </div>
         </div>
+
+        {/* Pause Overlay */}
+        {game.isPaused && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+            onClick={() => game.send({ type: "round.resume" })}
+          >
+            <div className="flex flex-col items-center gap-6 rounded-xl bg-white p-8 shadow-2xl">
+              <div className="text-6xl">⏸</div>
+              <h2 className="text-3xl font-bold text-gray-800">Game Paused</h2>
+              <p className="text-gray-600">Click anywhere or press Escape to continue</p>
+              <button
+                onClick={() => game.send({ type: "round.resume" })}
+                className="rounded-lg bg-green-600 px-8 py-4 text-xl font-bold text-white shadow-lg transition-transform hover:scale-105 hover:bg-green-700"
+              >
+                Resume Game
+              </button>
+            </div>
+          </motion.div>
+        )}
       </div>
     </LayoutGroup>
   );

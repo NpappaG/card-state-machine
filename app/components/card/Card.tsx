@@ -9,7 +9,7 @@ interface CardProps {
   card: CardType;
   isSelected?: boolean;
   isDisabled?: boolean;
-  animationState?: 'idle' | 'selected' | 'exiting' | 'inHand' | 'entering' | 'autoPlaying';
+  animationState?: 'idle' | 'selected' | 'exiting' | 'inHand' | 'entering' | 'autoPlaying' | 'shake';
   onClick?: () => void;
   layoutId?: string;
   disabled?: boolean;

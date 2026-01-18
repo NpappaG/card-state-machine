@@ -229,6 +229,7 @@ export function initializeGameReducer(
     selectedCards: [],
     timerStartMs: performance.now(),
     timerRemainingMs: timing.ROUND_DURATION_MS,
+    pausedAt: null,
     roundScores: Object.fromEntries(players.map((p) => [p.id, 0])),
     timing,
   };
@@ -365,6 +366,31 @@ export function updateTimerReducer(context: GameContext, timestamp: number): Gam
   return {
     ...context,
     timerRemainingMs: remaining,
+  };
+}
+
+/**
+ * Pause the timer by recording when the pause happened.
+ */
+export function pauseTimerReducer(context: GameContext, timestamp: number): GameContext {
+  return {
+    ...context,
+    pausedAt: timestamp,
+  };
+}
+
+/**
+ * Resume the timer by adjusting timerStartMs to account for paused time.
+ */
+export function resumeTimerReducer(context: GameContext, timestamp: number): GameContext {
+  if (context.pausedAt === null) return context;
+
+  const pausedDuration = timestamp - context.pausedAt;
+
+  return {
+    ...context,
+    timerStartMs: context.timerStartMs + pausedDuration,
+    pausedAt: null,
   };
 }
 

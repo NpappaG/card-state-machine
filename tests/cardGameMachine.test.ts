@@ -43,6 +43,7 @@ function buildActor(value: any, context: Partial<GameContext>) {
     selectedCards: context.selectedCards ?? [],
     timerStartMs: context.timerStartMs ?? 0,
     timerRemainingMs: context.timerRemainingMs ?? 180000,
+    pausedAt: context.pausedAt ?? null,
     roundScores: context.roundScores ?? {},
     timing: context.timing ?? {
       CHECKING_DELAY: GAME_TIMING.CHECKING_DELAY,
@@ -67,7 +68,7 @@ test('selecting state transitions to evaluating when selection matches top card'
   const player = makePlayer([selection[0], makeCard('Q')]);
 
   const actor = buildActor(
-    { roundActive: { playerTurn: 'selecting' } },
+    { roundActive: { playing: { playerTurn: 'selecting' } } },
     {
       players: [player],
       discardPile: [topCard],
@@ -79,7 +80,7 @@ test('selecting state transitions to evaluating when selection matches top card'
   const next = actor.getSnapshot();
   actor.stop();
   // With delays, should be in evaluating state (waiting for EVALUATING_DELAY before checking win conditions)
-  expect(next.value).toEqual({ roundActive: { playerTurn: 'evaluating' } });
+  expect(next.value).toEqual({ roundActive: { playing: { playerTurn: 'evaluating' } } });
   expect(next.context.players[0].hand.length).toBe(1);
 });
 
@@ -89,7 +90,7 @@ test('invalid selection keeps machine in selecting state', () => {
   const player = makePlayer([...selection, makeCard('5', 'clubs')]);
 
   const actor = buildActor(
-    { roundActive: { playerTurn: 'selecting' } },
+    { roundActive: { playing: { playerTurn: 'selecting' } } },
     {
       players: [player],
       discardPile: [topCard],
@@ -100,14 +101,14 @@ test('invalid selection keeps machine in selecting state', () => {
   actor.send({ type: 'card.play' });
   const next = actor.getSnapshot();
   actor.stop();
-  expect(next.value).toEqual({ roundActive: { playerTurn: 'selecting' } });
+  expect(next.value).toEqual({ roundActive: { playing: { playerTurn: 'selecting' } } });
 });
 
 test('card.select adds card to selection when available', () => {
   const card = makeCard('J');
   const player = makePlayer([card]);
   const actor = buildActor(
-    { roundActive: { playerTurn: 'selecting' } },
+    { roundActive: { playing: { playerTurn: 'selecting' } } },
     {
       players: [player],
       selectedCards: [],
@@ -124,7 +125,7 @@ test('card.select adds card to selection when available', () => {
 test('card.deselect removes card from selection', () => {
   const card = makeCard('9');
   const actor = buildActor(
-    { roundActive: { playerTurn: 'selecting' } },
+    { roundActive: { playing: { playerTurn: 'selecting' } } },
     {
       players: [makePlayer([card])],
       selectedCards: [card],
@@ -171,7 +172,7 @@ test('selecting state waits for valid card.play before transitioning', () => {
   const player = makePlayer([match1, match2, makeCard('A')]);
 
   const actor = buildActor(
-    { roundActive: { playerTurn: 'selecting' } },
+    { roundActive: { playing: { playerTurn: 'selecting' } } },
     {
       players: [player],
       discardPile: [topCard],
@@ -183,7 +184,7 @@ test('selecting state waits for valid card.play before transitioning', () => {
   actor.send({ type: 'card.select', cardId: match1.id });
 
   let snapshot = actor.getSnapshot();
-  expect(snapshot.matches({ roundActive: { playerTurn: 'selecting' } })).toBe(true);
+  expect(snapshot.matches({ roundActive: { playing: { playerTurn: 'selecting' } } })).toBe(true);
 
   // Play selected card
   actor.send({ type: 'card.play' });
@@ -193,7 +194,7 @@ test('selecting state waits for valid card.play before transitioning', () => {
 
   // Should transition out of selecting after valid play
   // (May be in evaluating or changingTurn depending on always transitions)
-  expect(snapshot.matches({ roundActive: { playerTurn: 'selecting' } })).toBe(false);
+  expect(snapshot.matches({ roundActive: { playing: { playerTurn: 'selecting' } } })).toBe(false);
   // One card should be played to discard
   expect(snapshot.context.discardPile.length).toBe(2);
 });
@@ -211,7 +212,7 @@ test('evaluating state is observable with EVALUATING_DELAY', () => {
   const player = makePlayer([match, makeCard('A')]);
 
   const actor = buildActor(
-    { roundActive: { playerTurn: 'selecting' } },
+    { roundActive: { playing: { playerTurn: 'selecting' } } },
     {
       players: [player],
       discardPile: [topCard],
@@ -227,7 +228,7 @@ test('evaluating state is observable with EVALUATING_DELAY', () => {
 
   // Should be in evaluating (waiting for EVALUATING_DELAY)
   // Without delays, this would have cascaded to changingTurn instantly
-  expect(snapshot.matches({ roundActive: { playerTurn: 'evaluating' } })).toBe(true);
+  expect(snapshot.matches({ roundActive: { playing: { playerTurn: 'evaluating' } } })).toBe(true);
   // Card should be played
   expect(snapshot.context.discardPile.length).toBe(2);
 });
@@ -240,7 +241,7 @@ test('checkingCards state exists briefly with CHECKING_DELAY', () => {
   const player = makePlayer([match1, match2]);
 
   const actor = buildActor(
-    { roundActive: { playerTurn: 'checkingCards' } },
+    { roundActive: { playing: { playerTurn: 'checkingCards' } } },
     {
       players: [player],
       discardPile: [topCard],
@@ -252,7 +253,7 @@ test('checkingCards state exists briefly with CHECKING_DELAY', () => {
 
   // Should still be in checkingCards (waiting for CHECKING_DELAY before routing)
   // Without delays, would have instantly routed to selecting
-  expect(snapshot.matches({ roundActive: { playerTurn: 'checkingCards' } })).toBe(true);
+  expect(snapshot.matches({ roundActive: { playing: { playerTurn: 'checkingCards' } } })).toBe(true);
 });
 
 test('determineNextAction returns ROUND_END when deck empty and no matches', () => {
@@ -289,7 +290,7 @@ test('readyToAct routes to evaluating when AUTO_PLAY raised (single matching car
   const player = makePlayer([match]); // Only one card, matches top discard
 
   const actor = buildActor(
-    { roundActive: { playerTurn: 'checkingCards' } },
+    { roundActive: { playing: { playerTurn: 'checkingCards' } } },
     {
       players: [player],
       discardPile: [topCard],
@@ -300,7 +301,7 @@ test('readyToAct routes to evaluating when AUTO_PLAY raised (single matching car
   actor.stop();
 
   // Should be in checkingCards initially (waiting for CHECKING_DELAY)
-  expect(snapshot.matches({ roundActive: { playerTurn: 'checkingCards' } })).toBe(true);
+  expect(snapshot.matches({ roundActive: { playing: { playerTurn: 'checkingCards' } } })).toBe(true);
 
   // Note: Can't easily test async transition in synchronous test without waiting
   // This test documents the expected flow: checkingCards -> readyToAct -> AUTO_PLAY -> evaluating
@@ -313,7 +314,7 @@ test('readyToAct routes to selecting when SELECTING_REQUIRED raised (multiple ma
   const player = makePlayer([match1, match2, makeCard('3')]); // Two matches
 
   const actor = buildActor(
-    { roundActive: { playerTurn: 'checkingCards' } },
+    { roundActive: { playing: { playerTurn: 'checkingCards' } } },
     {
       players: [player],
       discardPile: [topCard],
@@ -324,7 +325,7 @@ test('readyToAct routes to selecting when SELECTING_REQUIRED raised (multiple ma
   actor.stop();
 
   // Should be in checkingCards initially
-  expect(snapshot.matches({ roundActive: { playerTurn: 'checkingCards' } })).toBe(true);
+  expect(snapshot.matches({ roundActive: { playing: { playerTurn: 'checkingCards' } } })).toBe(true);
 
   // Expected flow: checkingCards -> readyToAct -> SELECTING_REQUIRED -> selecting
 });
@@ -334,7 +335,7 @@ test('readyToAct routes to drawing when DRAW_REQUIRED raised (no matches, deck h
   const player = makePlayer([makeCard('2'), makeCard('3')]); // No matches
 
   const actor = buildActor(
-    { roundActive: { playerTurn: 'checkingCards' } },
+    { roundActive: { playing: { playerTurn: 'checkingCards' } } },
     {
       players: [player],
       discardPile: [topCard],
@@ -346,7 +347,7 @@ test('readyToAct routes to drawing when DRAW_REQUIRED raised (no matches, deck h
   actor.stop();
 
   // Should be in checkingCards initially
-  expect(snapshot.matches({ roundActive: { playerTurn: 'checkingCards' } })).toBe(true);
+  expect(snapshot.matches({ roundActive: { playing: { playerTurn: 'checkingCards' } } })).toBe(true);
 
   // Expected flow: checkingCards -> readyToAct -> DRAW_REQUIRED -> drawing
 });
@@ -356,7 +357,7 @@ test('readyToAct routes to roundEnd when ROUND_END raised (deck empty, no matche
   const player = makePlayer([makeCard('2'), makeCard('3')]); // No matches
 
   const actor = buildActor(
-    { roundActive: { playerTurn: 'checkingCards' } },
+    { roundActive: { playing: { playerTurn: 'checkingCards' } } },
     {
       players: [player],
       discardPile: [topCard],
@@ -368,7 +369,7 @@ test('readyToAct routes to roundEnd when ROUND_END raised (deck empty, no matche
   actor.stop();
 
   // Should be in checkingCards initially
-  expect(snapshot.matches({ roundActive: { playerTurn: 'checkingCards' } })).toBe(true);
+  expect(snapshot.matches({ roundActive: { playing: { playerTurn: 'checkingCards' } } })).toBe(true);
 
   // Expected flow: checkingCards -> readyToAct -> ROUND_END -> roundEnd
   // This prevents infinite loops when no one can play

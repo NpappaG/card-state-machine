@@ -76,6 +76,16 @@ export const cardGameMachine = setup({
       return Logic.updateTimerReducer(context, event.timestamp);
     }),
 
+    pauseTimer: assign(({ context, event }) => {
+      if (event.type !== "round.pause") return context;
+      return Logic.pauseTimerReducer(context, performance.now());
+    }),
+
+    resumeTimer: assign(({ context, event }) => {
+      if (event.type !== "round.resume") return context;
+      return Logic.resumeTimerReducer(context, performance.now());
+    }),
+
     calculateScores: assign(({ context }) =>
       Logic.calculateScoresReducer(context)
     ),
@@ -114,6 +124,7 @@ export const cardGameMachine = setup({
     selectedCards: [],
     timerStartMs: 0,
     timerRemainingMs: GAME_TIMING.ROUND_DURATION_MS,
+    pausedAt: null,
     roundScores: {},
     timing: {
       CHECKING_DELAY: GAME_TIMING.CHECKING_DELAY,
@@ -136,90 +147,111 @@ export const cardGameMachine = setup({
     },
 
     roundActive: {
-      invoke: {
-        src: "timer",
-      },
-      on: {
-        "timer.tick": {
-          actions: "updateTimer",
-        },
-      },
+      initial: "playing",
       always: {
         guard: "timerExpired",
         target: "roundEnd",
       },
-      initial: "playerTurn",
       states: {
-        playerTurn: {
-          initial: "checkingCards",
+        playing: {
+          invoke: {
+            src: "timer",
+          },
+          on: {
+            "timer.tick": {
+              actions: "updateTimer",
+            },
+            "round.pause": {
+              target: "#cardGame.roundActive.paused",
+              actions: "pauseTimer",
+            },
+          },
+          initial: "playerTurn",
           states: {
-            checkingCards: {
-              after: {
-                checkingDelay: "readyToAct",
-              },
-            },
-
-            readyToAct: {
-              entry: "decideNextAction",
-              on: {
-                ROUND_END: {
-                  target: "#cardGame.roundEnd",
-                },
-                AUTO_PLAY: {
-                  target: "evaluating",
-                  actions: "autoPlaySingleCard",
-                },
-                SELECTING_REQUIRED: {
-                  target: "selecting",
-                },
-                DRAW_REQUIRED: {
-                  target: "drawing",
-                },
-              },
-            },
-
-            selecting: {
-              on: {
-                "card.select": {
-                  actions: "selectCard",
-                },
-                "card.deselect": {
-                  actions: "deselectCard",
-                },
-                "card.play": {
-                  guard: "canPlaySelectedCards",
-                  target: "evaluating",
-                  actions: "playSelectedCards",
-                },
-              },
-            },
-
-            drawing: {
-              entry: "drawCard",
-              after: {
-                drawDelay: "evaluating",
-              },
-            },
-
-            evaluating: {
-              after: {
-                evaluatingDelay: [
-                  {
-                    guard: "currentPlayerHasNoCards",
-                    target: "#cardGame.roundEnd",
+            playerTurn: {
+              initial: "checkingCards",
+              states: {
+                checkingCards: {
+                  after: {
+                    checkingDelay: "readyToAct",
                   },
-                  {
-                    target: "changingTurn",
+                },
+
+                readyToAct: {
+                  entry: "decideNextAction",
+                  on: {
+                    ROUND_END: {
+                      target: "#cardGame.roundEnd",
+                    },
+                    AUTO_PLAY: {
+                      target: "evaluating",
+                      actions: "autoPlaySingleCard",
+                    },
+                    SELECTING_REQUIRED: {
+                      target: "selecting",
+                    },
+                    DRAW_REQUIRED: {
+                      target: "drawing",
+                      actions: "drawCard",
+                    },
                   },
-                ],
+                },
+
+                selecting: {
+                  on: {
+                    "card.select": {
+                      actions: "selectCard",
+                    },
+                    "card.deselect": {
+                      actions: "deselectCard",
+                    },
+                    "card.play": {
+                      guard: "canPlaySelectedCards",
+                      target: "evaluating",
+                      actions: "playSelectedCards",
+                    },
+                  },
+                },
+
+                drawing: {
+                  after: {
+                    drawDelay: "evaluating",
+                  },
+                },
+
+                evaluating: {
+                  after: {
+                    evaluatingDelay: [
+                      {
+                        guard: "currentPlayerHasNoCards",
+                        target: "#cardGame.roundEnd",
+                      },
+                      {
+                        target: "changingTurn",
+                        actions: "advanceTurn",
+                      },
+                    ],
+                  },
+                },
+
+                changingTurn: {
+                  after: {
+                    turnChangeDelay: "checkingCards",
+                  },
+                },
               },
             },
-
-            changingTurn: {
-              entry: "advanceTurn",
-              after: {
-                turnChangeDelay: "checkingCards",
-              },
+            hist: {
+              type: "history",
+              history: "deep",
+            },
+          },
+        },
+        paused: {
+          on: {
+            "round.resume": {
+              target: "#cardGame.roundActive.playing.hist",
+              actions: "resumeTimer",
             },
           },
         },

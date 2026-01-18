@@ -75,11 +75,13 @@ export function useCardGame() {
     isIdle: isSetupState,
     isSetup: isSetupState,
     isRoundActive: snapshot.matches('roundActive'),
-    isCheckingCards: snapshot.matches({ roundActive: { playerTurn: 'checkingCards' } }),
-    isSelecting: snapshot.matches({ roundActive: { playerTurn: 'selecting' } }),
-    isDrawing: snapshot.matches({ roundActive: { playerTurn: 'drawing' } }),
-    isEvaluating: snapshot.matches({ roundActive: { playerTurn: 'evaluating' } }),
-    isChangingTurn: snapshot.matches({ roundActive: { playerTurn: 'changingTurn' } }),
+    isPaused: snapshot.matches({ roundActive: 'paused' }),
+    isPlaying: snapshot.matches({ roundActive: 'playing' }),
+    isCheckingCards: snapshot.matches({ roundActive: { playing: { playerTurn: 'checkingCards' } } }),
+    isSelecting: snapshot.matches({ roundActive: { playing: { playerTurn: 'selecting' } } }),
+    isDrawing: snapshot.matches({ roundActive: { playing: { playerTurn: 'drawing' } } }),
+    isEvaluating: snapshot.matches({ roundActive: { playing: { playerTurn: 'evaluating' } } }),
+    isChangingTurn: snapshot.matches({ roundActive: { playing: { playerTurn: 'changingTurn' } } }),
     isRoundEnd: snapshot.matches('roundEnd'),
 
     // Convenience methods

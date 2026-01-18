@@ -45,6 +45,7 @@ function makeContext(overrides: Partial<GameContext> = {}): GameContext {
     selectedCards: overrides.selectedCards ?? [],
     timerStartMs: overrides.timerStartMs ?? 0,
     timerRemainingMs: overrides.timerRemainingMs ?? 180000,
+    pausedAt: overrides.pausedAt ?? null,
     roundScores: overrides.roundScores ?? {},
     timing: overrides.timing ?? {
       CHECKING_DELAY: GAME_TIMING.CHECKING_DELAY,

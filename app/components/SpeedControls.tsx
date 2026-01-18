@@ -39,7 +39,7 @@ export function SpeedControls() {
           </label>
           <input
             type="range"
-            min="500"
+            min="0"
             max="5000"
             step="100"
             value={timing.CHECKING_DELAY}
@@ -56,7 +56,7 @@ export function SpeedControls() {
           </label>
           <input
             type="range"
-            min="500"
+            min="0"
             max="3000"
             step="50"
             value={timing.DRAW_DELAY}
@@ -73,7 +73,7 @@ export function SpeedControls() {
           </label>
           <input
             type="range"
-            min="200"
+            min="0"
             max="2000"
             step="50"
             value={timing.EVALUATING_DELAY}
@@ -90,7 +90,7 @@ export function SpeedControls() {
           </label>
           <input
             type="range"
-            min="100"
+            min="0"
             max="1000"
             step="50"
             value={timing.TURN_CHANGE_DELAY}

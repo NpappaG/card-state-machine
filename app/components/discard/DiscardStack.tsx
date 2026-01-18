@@ -13,7 +13,7 @@ interface DiscardStackProps {
  * Animated discard pile that shows stacked cards with the top card prominently displayed.
  * Shows last few cards stacked behind for visual depth.
  */
-export function DiscardStack({ discardPile, maxVisible = Infinity }: DiscardStackProps) {
+export function DiscardStack({ discardPile, maxVisible = 52 }: DiscardStackProps) {
   if (discardPile.length === 0) {
     return (
       <div className="flex h-full w-full items-center justify-center rounded-lg border-2 border-dashed border-white/50 bg-green-800/50">
