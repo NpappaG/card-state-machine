@@ -38,10 +38,18 @@ export const cardGameMachine = setup({
       if (event.type !== "game.start") {
         throw new Error("initializeGame called with wrong event type");
       }
-      return Logic.initializeGameReducer(event.playerCount, event.playerNames, context.timing);
+      return Logic.initializeGameReducer(
+        event.playerCount,
+        event.playerNames,
+        context.timing,
+        event.timestamp
+      );
     }),
 
-    startTimer: assign(({ context }) => Logic.startTimerReducer(context)),
+    startTimer: assign(({ context, event }) => {
+      if (event.type !== "game.start") return context;
+      return Logic.startTimerReducer(context, event.timestamp);
+    }),
 
     // Decision action - raises internal event based on game state
     decideNextAction: raise(({ context }) => ({
@@ -78,12 +86,12 @@ export const cardGameMachine = setup({
 
     pauseTimer: assign(({ context, event }) => {
       if (event.type !== "round.pause") return context;
-      return Logic.pauseTimerReducer(context, performance.now());
+      return Logic.pauseTimerReducer(context, event.timestamp);
     }),
 
     resumeTimer: assign(({ context, event }) => {
       if (event.type !== "round.resume") return context;
-      return Logic.resumeTimerReducer(context, performance.now());
+      return Logic.resumeTimerReducer(context, event.timestamp);
     }),
 
     calculateScores: assign(({ context }) =>

@@ -32,10 +32,11 @@ export default function GamePage() {
       // Escape to pause/unpause
       if (e.code === "Escape" && game.isRoundActive) {
         e.preventDefault();
+        const timestamp = performance.now();
         if (game.isPaused) {
-          game.send({ type: "round.resume" });
+          game.send({ type: "round.resume", timestamp });
         } else {
-          game.send({ type: "round.pause" });
+          game.send({ type: "round.pause", timestamp });
         }
         return;
       }
@@ -57,7 +58,7 @@ export default function GamePage() {
 
   // Start game handler
   const handleStartGame = () => {
-    game.send({ type: "game.start", playerCount });
+    game.send({ type: "game.start", playerCount, timestamp: performance.now() });
   };
 
   // Card click handler - only one card can be selected at a time
@@ -316,7 +317,12 @@ export default function GamePage() {
           <div className="flex items-center gap-4">
             {/* Pause Button */}
             <button
-              onClick={() => game.send({ type: game.isPaused ? "round.resume" : "round.pause" })}
+              onClick={() =>
+                game.send({
+                  type: game.isPaused ? "round.resume" : "round.pause",
+                  timestamp: performance.now(),
+                })
+              }
               className="flex items-center gap-2 rounded-lg bg-gray-700 px-4 py-2 text-white hover:bg-gray-600 transition-colors"
               aria-label={game.isPaused ? "Resume game" : "Pause game"}
             >
@@ -480,14 +486,18 @@ export default function GamePage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-            onClick={() => game.send({ type: "round.resume" })}
+            onClick={() =>
+              game.send({ type: "round.resume", timestamp: performance.now() })
+            }
           >
             <div className="flex flex-col items-center gap-6 rounded-xl bg-white p-8 shadow-2xl">
               <div className="text-6xl">⏸</div>
               <h2 className="text-3xl font-bold text-gray-800">Game Paused</h2>
               <p className="text-gray-600">Click anywhere or press Escape to continue</p>
               <button
-                onClick={() => game.send({ type: "round.resume" })}
+                onClick={() =>
+                  game.send({ type: "round.resume", timestamp: performance.now() })
+                }
                 className="rounded-lg bg-green-600 px-8 py-4 text-xl font-bold text-white shadow-lg transition-transform hover:scale-105 hover:bg-green-700"
               >
                 Resume Game

@@ -191,7 +191,8 @@ export function initializeGameReducer(
     EVALUATING_DELAY: GAME_TIMING.EVALUATING_DELAY,
     TURN_CHANGE_DELAY: GAME_TIMING.TURN_CHANGE_DELAY,
     ROUND_DURATION_MS: GAME_TIMING.ROUND_DURATION_MS,
-  }
+  },
+  timerStartMs: number = 0
 ): GameContext {
   const clampedPlayerCount = Math.max(2, Math.min(4, playerCount));
 
@@ -227,7 +228,7 @@ export function initializeGameReducer(
     deck,
     discardPile,
     selectedCards: [],
-    timerStartMs: performance.now(),
+    timerStartMs,
     timerRemainingMs: timing.ROUND_DURATION_MS,
     pausedAt: null,
     roundScores: Object.fromEntries(players.map((p) => [p.id, 0])),
@@ -238,10 +239,10 @@ export function initializeGameReducer(
 /**
  * Start/reset the timer.
  */
-export function startTimerReducer(context: GameContext): GameContext {
+export function startTimerReducer(context: GameContext, timestamp: number): GameContext {
   return {
     ...context,
-    timerStartMs: performance.now(),
+    timerStartMs: timestamp,
   };
 }
 

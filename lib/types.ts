@@ -49,12 +49,12 @@ export type GameContext = {
 // Game events (using dot notation for XState v5 convention)
 export type GameEvent =
   // External events (from UI/user)
-  | { type: 'game.start'; playerCount: number; playerNames?: string[] }
+  | { type: 'game.start'; playerCount: number; playerNames?: string[]; timestamp: number }
   | { type: 'card.select'; cardId: string }
   | { type: 'card.deselect'; cardId: string }
   | { type: 'card.play' }
   | { type: 'timer.tick'; timestamp: number }
-  | { type: 'round.pause' }
-  | { type: 'round.resume' }
+  | { type: 'round.pause'; timestamp: number }
+  | { type: 'round.resume'; timestamp: number }
   | { type: 'game.newRound' }
   | { type: 'game.over' };

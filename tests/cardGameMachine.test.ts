@@ -152,7 +152,7 @@ test('setup transitions to roundActive on game.start event', () => {
 
   expect(actor.getSnapshot().value).toBe('setup');
 
-  actor.send({ type: 'game.start', playerCount: 2 });
+  actor.send({ type: 'game.start', playerCount: 2, timestamp: 1000 });
 
   const snapshot = actor.getSnapshot();
   actor.stop();

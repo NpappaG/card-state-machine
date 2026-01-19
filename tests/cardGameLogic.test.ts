@@ -500,10 +500,11 @@ describe('initializeGameReducer', () => {
 describe('startTimerReducer', () => {
   test('updates timerStartMs without mutating context', () => {
     const originalContext = makeContext();
-    const updatedContext = Logic.startTimerReducer(originalContext);
+    const timestamp = 12345;
+    const updatedContext = Logic.startTimerReducer(originalContext, timestamp);
 
     expect(updatedContext).not.toBe(originalContext);
-    expect(updatedContext.timerStartMs).toBeGreaterThan(0);
+    expect(updatedContext.timerStartMs).toBe(timestamp);
   });
 
   test('preserves all other context properties', () => {
@@ -514,7 +515,7 @@ describe('startTimerReducer', () => {
       deck: [makeCard('Q')],
     });
 
-    const updatedContext = Logic.startTimerReducer(originalContext);
+    const updatedContext = Logic.startTimerReducer(originalContext, 5000);
 
     expect(updatedContext.players).toBe(originalContext.players);
     expect(updatedContext.deck).toBe(originalContext.deck);
