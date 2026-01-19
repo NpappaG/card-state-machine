@@ -52,10 +52,12 @@ export function currentPlayerHasNoCards(context: GameContext): boolean {
 
 /**
  * Check if the round timer has expired.
- * Win condition: when timer reaches 0, round ends.
+ * Note: Timer state is now owned by the timer machine.
+ * This function is deprecated - use timer actor snapshot instead.
  */
-export function timerExpired(context: GameContext): boolean {
-  return context.timerRemainingMs <= 0;
+export function timerExpired(_context: GameContext): boolean {
+  // Timer state now lives in timer machine - read from actor snapshot
+  return false;
 }
 
 /**
@@ -64,54 +66,6 @@ export function timerExpired(context: GameContext): boolean {
  */
 export function deckEmpty(context: GameContext): boolean {
   return context.deck.length === 0;
-}
-
-export type NextAction =
-  | 'ROUND_END'
-  | 'AUTO_PLAY'
-  | 'SELECTING_REQUIRED'
-  | 'DRAW_REQUIRED';
-
-/**
- * Determines the next action for the current player based on game state.
- *
- * Decision Order:
- * 1. ROUND_END - Current player has no cards (win condition)
- * 2. AUTO_PLAY - Exactly one matching card (auto-play it)
- * 3. SELECTING_REQUIRED - Multiple matching cards (manual selection)
- * 4. ROUND_END - Deck is empty and no matching cards (can't continue)
- * 5. DRAW_REQUIRED - No matching cards but deck has cards (must draw)
- *
- * Deck Empty Rule:
- * When the deck runs out, the round ends. This prevents infinite loops where
- * all players skip turns because no one has matching cards. The round ends when:
- * - A player runs out of cards (wins), OR
- * - The deck is exhausted (no more cards to draw), OR
- * - The 3-minute timer expires
- */
-export function determineNextAction(context: GameContext): NextAction {
-  // Check win condition first
-  if (currentPlayerHasNoCards(context)) {
-    return 'ROUND_END';
-  }
-
-  // Check for auto-play (single matching card)
-  if (hasSingleValidCard(context)) {
-    return 'AUTO_PLAY';
-  }
-
-  // Check for selection (multiple matching cards)
-  if (hasMultipleValidCards(context)) {
-    return 'SELECTING_REQUIRED';
-  }
-
-  // Check if deck is empty (can't draw, round ends)
-  if (deckEmpty(context)) {
-    return 'ROUND_END';
-  }
-
-  // Default: need to draw
-  return 'DRAW_REQUIRED';
 }
 
 // ============================================================================
@@ -191,8 +145,7 @@ export function initializeGameReducer(
     EVALUATING_DELAY: GAME_TIMING.EVALUATING_DELAY,
     TURN_CHANGE_DELAY: GAME_TIMING.TURN_CHANGE_DELAY,
     ROUND_DURATION_MS: GAME_TIMING.ROUND_DURATION_MS,
-  },
-  timerStartMs: number = 0
+  }
 ): GameContext {
   const clampedPlayerCount = Math.max(2, Math.min(4, playerCount));
 
@@ -228,21 +181,8 @@ export function initializeGameReducer(
     deck,
     discardPile,
     selectedCards: [],
-    timerStartMs,
-    timerRemainingMs: timing.ROUND_DURATION_MS,
-    pausedAt: null,
     roundScores: Object.fromEntries(players.map((p) => [p.id, 0])),
     timing,
-  };
-}
-
-/**
- * Start/reset the timer.
- */
-export function startTimerReducer(context: GameContext, timestamp: number): GameContext {
-  return {
-    ...context,
-    timerStartMs: timestamp,
   };
 }
 
@@ -354,44 +294,6 @@ export function advanceTurnReducer(context: GameContext): GameContext {
     ...context,
     currentPlayerIndex: (context.currentPlayerIndex + 1) % context.players.length,
     selectedCards: [],
-  };
-}
-
-/**
- * Update the timer based on elapsed time.
- */
-export function updateTimerReducer(context: GameContext, timestamp: number): GameContext {
-  const elapsed = timestamp - context.timerStartMs;
-  const remaining = Math.max(0, context.timing.ROUND_DURATION_MS - elapsed);
-
-  return {
-    ...context,
-    timerRemainingMs: remaining,
-  };
-}
-
-/**
- * Pause the timer by recording when the pause happened.
- */
-export function pauseTimerReducer(context: GameContext, timestamp: number): GameContext {
-  return {
-    ...context,
-    pausedAt: timestamp,
-  };
-}
-
-/**
- * Resume the timer by adjusting timerStartMs to account for paused time.
- */
-export function resumeTimerReducer(context: GameContext, timestamp: number): GameContext {
-  if (context.pausedAt === null) return context;
-
-  const pausedDuration = timestamp - context.pausedAt;
-
-  return {
-    ...context,
-    timerStartMs: context.timerStartMs + pausedDuration,
-    pausedAt: null,
   };
 }
 

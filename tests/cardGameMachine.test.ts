@@ -2,7 +2,6 @@ import { test, expect } from 'bun:test';
 import { createActor } from 'xstate';
 import { cardGameMachine } from '../machines/cardGameMachine';
 import { GAME_TIMING } from '../lib/constants';
-import { determineNextAction } from '../machines/cardGameLogic';
 import type { Card, GameContext, Player, Rank, Suit } from '../lib/types';
 
 function makeCard(rank: Rank, suit: Suit = 'hearts'): Card {
@@ -256,27 +255,6 @@ test('checkingCards state exists briefly with CHECKING_DELAY', () => {
   expect(snapshot.matches({ roundActive: { playing: { playerTurn: 'checkingCards' } } })).toBe(true);
 });
 
-test('determineNextAction returns ROUND_END when deck empty and no matches', () => {
-  const context = {
-    players: [makePlayer([makeCard('2'), makeCard('3')])],
-    currentPlayerIndex: 0,
-    deck: [],
-    discardPile: [makeCard('K')],
-    selectedCards: [],
-    timerStartMs: 0,
-    timerRemainingMs: 180000,
-    roundScores: {},
-    timing: {
-      CHECKING_DELAY: GAME_TIMING.CHECKING_DELAY,
-      DRAW_DELAY: GAME_TIMING.DRAW_DELAY,
-      EVALUATING_DELAY: GAME_TIMING.EVALUATING_DELAY,
-      TURN_CHANGE_DELAY: GAME_TIMING.TURN_CHANGE_DELAY,
-      ROUND_DURATION_MS: GAME_TIMING.ROUND_DURATION_MS,
-    },
-  };
-
-  expect(determineNextAction(context as GameContext)).toBe('ROUND_END');
-});
 
 // ============================================================================
 // Routing Integration Tests (readyToAct Decision Hub)

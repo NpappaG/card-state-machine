@@ -1,27 +1,16 @@
-import { setup, assign, fromCallback, raise } from "xstate";
+import { setup, assign, sendTo } from "xstate";
 import type { GameContext, GameEvent } from "@/lib/types";
 import * as Logic from "./cardGameLogic";
 import { GAME_TIMING } from "@/lib/constants";
+import { timerMachine } from "./timerMachine";
 
-// Timer actor using fromCallback - got this idea from Xstate examples
-const timerLogic = fromCallback(({ sendBack }) => {
-  const interval = setInterval(() => {
-    sendBack({ type: "timer.tick", timestamp: performance.now() });
-  }, 1000); // Tick every second
+const TIMER_TICK_MS = 1000;
 
-  return () => clearInterval(interval);
-});
-
-type InternalEvent =
-  | { type: "ROUND_END" }
-  | { type: "AUTO_PLAY" }
-  | { type: "SELECTING_REQUIRED" }
-  | { type: "DRAW_REQUIRED" }
-  | { type: "timing.update"; timing: GameContext['timing'] };
+type InternalEvent = { type: "timing.update"; timing: GameContext['timing'] };
 
 const startGameTransition = {
   target: "roundActive",
-  actions: ["initializeGame", "startTimer"],
+  actions: ["initializeGame"],
 } as const;
 
 export const cardGameMachine = setup({
@@ -30,41 +19,31 @@ export const cardGameMachine = setup({
     events: {} as GameEvent | InternalEvent,
   },
   actors: {
-    timer: timerLogic,
+    timer: timerMachine,
   },
   actions: {
     // Setup actions - delegating to pure functions from cardGameLogic.ts
     initializeGame: assign(({ event, context }) => {
-      if (event.type !== "game.start") {
-        throw new Error("initializeGame called with wrong event type");
-      }
+      // Machine structure guarantees this is only called on game.start
+      const startEvent = event as Extract<GameEvent, { type: "game.start" }>;
       return Logic.initializeGameReducer(
-        event.playerCount,
-        event.playerNames,
-        context.timing,
-        event.timestamp
+        startEvent.playerCount,
+        startEvent.playerNames,
+        context.timing
       );
     }),
 
-    startTimer: assign(({ context, event }) => {
-      if (event.type !== "game.start") return context;
-      return Logic.startTimerReducer(context, event.timestamp);
-    }),
-
-    // Decision action - raises internal event based on game state
-    decideNextAction: raise(({ context }) => ({
-      type: Logic.determineNextAction(context),
-    })),
-
     // Card actions - delegating to pure functions from cardGameLogic.ts
     selectCard: assign(({ context, event }) => {
-      if (event.type !== "card.select") return context;
-      return Logic.selectCardReducer(context, event.cardId);
+      // Machine structure guarantees this is only called on card.select
+      const selectEvent = event as Extract<GameEvent, { type: "card.select" }>;
+      return Logic.selectCardReducer(context, selectEvent.cardId);
     }),
 
     deselectCard: assign(({ context, event }) => {
-      if (event.type !== "card.deselect") return context;
-      return Logic.deselectCardReducer(context, event.cardId);
+      // Machine structure guarantees this is only called on card.deselect
+      const deselectEvent = event as Extract<GameEvent, { type: "card.deselect" }>;
+      return Logic.deselectCardReducer(context, deselectEvent.cardId);
     }),
 
     playSelectedCards: assign(({ context }) =>
@@ -79,19 +58,14 @@ export const cardGameMachine = setup({
 
     advanceTurn: assign(({ context }) => Logic.advanceTurnReducer(context)),
 
-    updateTimer: assign(({ context, event }) => {
-      if (event.type !== "timer.tick") return context;
-      return Logic.updateTimerReducer(context, event.timestamp);
+    forwardPauseToTimer: sendTo("timer", ({ event }) => {
+      const pauseEvent = event as Extract<GameEvent, { type: "round.pause" }>;
+      return { type: "timer.pause", timestamp: pauseEvent.timestamp };
     }),
 
-    pauseTimer: assign(({ context, event }) => {
-      if (event.type !== "round.pause") return context;
-      return Logic.pauseTimerReducer(context, event.timestamp);
-    }),
-
-    resumeTimer: assign(({ context, event }) => {
-      if (event.type !== "round.resume") return context;
-      return Logic.resumeTimerReducer(context, event.timestamp);
+    forwardResumeToTimer: sendTo("timer", ({ event }) => {
+      const resumeEvent = event as Extract<GameEvent, { type: "round.resume" }>;
+      return { type: "timer.resume", timestamp: resumeEvent.timestamp };
     }),
 
     calculateScores: assign(({ context }) =>
@@ -99,12 +73,14 @@ export const cardGameMachine = setup({
     ),
 
     updateTimingConfig: assign(({ event }) => {
-      if (event.type !== "timing.update") return {};
-      return { timing: event.timing };
+      // Machine structure guarantees this is only called on timing.update
+      const updateEvent = event as Extract<InternalEvent, { type: "timing.update" }>;
+      return { timing: updateEvent.timing };
     }),
   },
 
   delays: {
+    // this uses the Dynamic delays, defines them as a function returning delay time in ms
     checkingDelay: ({ context }) => context.timing.CHECKING_DELAY,
     drawDelay: ({ context }) => context.timing.DRAW_DELAY,
     evaluatingDelay: ({ context }) => context.timing.EVALUATING_DELAY,
@@ -112,16 +88,17 @@ export const cardGameMachine = setup({
   },
 
   guards: {
-    // Card validation guards - delegating to pure functions from cardGameLogic.ts
+    // Card validation + win validation guards - delegating to pure functions from cardGameLogic.ts
     canPlaySelectedCards: ({ context }) => Logic.canPlaySelectedCards(context),
-
-    // Win condition guards - delegating to pure functions from cardGameLogic.ts
     currentPlayerHasNoCards: ({ context }) =>
       Logic.currentPlayerHasNoCards(context),
-    timerExpired: ({ context }) => Logic.timerExpired(context),
+    hasMultipleValidCards: ({ context }) =>
+      Logic.hasMultipleValidCards(context),
+    hasSingleValidCard: ({ context }) => Logic.hasSingleValidCard(context),
+    deckEmpty: ({ context }) => Logic.deckEmpty(context),
   },
 }).createMachine({
-  /** @xstate-layout N4IgpgJg5mDOIC5QGMCGAnCBxVBbMAxAC4CWuJAdlAHQCuADhKkWANoAMAuoqPQPawSpPhR4gAHonYAaEAE8pAX0Wy0mHPmro+tChACCyUgDdCpfOmqlkAaw7ckIfoOGjHkhDPlKVINdjwwLR09QxNCezFnIRIRMQ8vBU9lVQwAzW1dAyMSU2p6ABtUOTB0ABVadApqZAALMFtKKABhNNgCcVgiZiDUADMWdAAKOoabJoARMCK5AEoCfw0gzNCcvMLi0oqqmvrGqlbMWEjHaNd4xABGagBWG4BmABYANnuATnvLt8fHm4Amdg3WRJAC07Gofxuvze7D+AA57nCXpdHpdnik-GklsEsmFckENiVypVqugwKgIHIynwwgQAEoAeQAqgA5CYAfQAomyTrwBDE4u4pMCfKl1IEcatwvkZlsSVpyZTqbT9Eyygz2QAFAAy+gAmrynPzzkKENc7k9Xh8vj9-oCRQgwRCoTcYfDEcjUejfIsJStstLCXKdmSKVSaUYCABlTnaznNMoASRZWHZdM5AEUmYn0xNDWdYm5QB5zQ8Xu9Pt9fgCgd5HeDIdDYQikc8UWiMb6MiEA-iZZtiSHFeHaRM6foAOppzPZ3P542Fi5m25lq2V201h1Oxuu5setteztYv09vHrWWD6qwaYNUhUBZpajXgq3+cuRem0uWis26v2uvbi6botp6HY+se3a4msBIXtsV43jk97+NQEBwAhRBvgKRYSFcK7ftaVZ2rWoINkBe6tu23piukyyntB-ZEnBT7oU0D6YAxmEmsWVxvH81BvM87BtuwbxwsJcJiQ6lxCfc1ASQA7H8yKQs8byXDcR7ipBUp9kGl4oegqAAO6sZ03QsNQ-SDEMECGUZUwzPMXa0VBgawfKtnGU0nEftxy4WuWBEbv+JHOk27oUYe4FaS5OnngOTFgMYqAFLQzCmV0PSWQMpRDElKVpXeUAOcUTkQbFvbxYx8r5al6VUD5gp+YkoqYjFkqVTBCU1cldVFR0mUWVZuW1YVkzTKVbE0R1Z5ddVOyjfVUCsJcDh8u+TU4Wa8lvNQ9z3H8fzSfc7A-H8Dp-Cde13Jc8k3Jcnxwg9p2adN-qzQxwbVHUqBUE0cEDeZvQ5cMRAks0tS-TAJVzFN2LvfRelMT9f1UHBjXYR4N1yadCLVpch0iVJby7bxzyQuw7BifJ7D3N6vgUHwqHwI4zlRAum0eCCKKPFunzgr8LxU1Crz3Dtr3YteYP0OzG2Y4gIIvNQzyPPJ8lon8qmIvJYu8wBvxyTczwSRTUI8-cEsnq5+Ky1hS4gt81A-M8DyCcbgJQnCW6HXxasCepin+98GnRW9dFud1VS21xW2K88TsvK7Qlwh7jxewBcLyfxfxvK6OuvI8h1wm8lvaZ1n36aM+wtG00e+VtfyKXtOuIgCaffCrDqFzc-GugiB6qY3fylxVH1I-KoZKhGRB15ziBp3xPyws88mZ43uMOq6PcHepNzyeT8mqwTI8zYj7k7M+t5NLP8sIE8PcokbMKXGJ7Av3rSRq481Dvy88LFzTY2J8EYR3mtUTyJkqA3yXJaJ2JNBJIhhDcBEe8HS8R7rTe6+9M7-ChI8YB4ddLn2qItIq0DTRHT4kdZ6iJPg60eLTKSdNv5vzuncXiqIjoEOtlVL6uwob-RJOQvyj05KrwYbxVeSk3hSRflnD4h0X5PSplTbhehOR6GEbHASUlVbf0Ph6LegJi4h2UEAA */
+  /** @xstate-layout N4IgpgJg5mDOIC5QGMCGAnCBxVBbMAxAC4CWuJAdlAHQCuADhKkWANoAMAuoqPQPawSpPhR4gAHogC0AFgCs7agHYAnOwBs6gIzq16gEwAOFQBoQAT2n651XYa1Kl7FVqMb9AXw9m0mHPmp0PloKCABBZFIAN0IObiQQfkFhUQTJBCk5AGZFFUN9GS0ZGQ11GX11M0sMrRVqFRl8vK13R09vEF9sPDBA4NCI6N76ABtUc0ooYjIwdGpSZABrOLEkoRIRMWqpfV2zdIUZLx8MboCgkPDIkhjqUfHJggvQu9RaWDYuVYF1zbTEQ5VKxOY6dU7+XrPK5DO5jCZUWHjWYAFVo6Ao1GQAAswEtJgBhU6wAjiWBEZi9VAAMxY6AAFNjcYtJgARMBwgCUBC6EL6l0GN2GcMmiPMKLRGMZeKohMwsBWCTWKTE6QqWmochk6kMSjkQIQLUM1HYSns1lBPJ6fIG11u93hNHt4vRgTAqAg5mRfEGBAASgB5ACqADkWQB9ACioYVvB+yv+GS1Ngc2iUWTkDgqWXT+pUGeUalc6lNqkMxgt4KtUIFduFCKd6FRLvQbo9Xp9YUDyP9YYACgAZMIATRjiTjG1SoHSafVZbyxbk+XUckX+v0KiU9Ws2qy+iyukXmgrfir-WhgtFIobTYxLfdnu9kQIAGUI-2I-jkQBJYNYMO+iMAEVAy-ACWVHJUJxVRBtRsXUDD3LQMyKfUZDUagslcNDjAcGd2hOE9zjPGshQees4WdW9WwfH0WV9MIAHV-yAkCwIg8c-inRBsxkah9C0HU9QsRAdCNJCDDkY8zkhYjbVIh1RUo6gPhGXFSCoblTmU9k1PY5IoITfi6gk-UdE3ORTVcSSOktIj+Tky9yKRRsJW01Trg0rpqAgOAdMiPTfknCRECM2xrDXXVbDkCSpN5asHPtK8KJcl0VLUx4vPtAL4y4hB9yyagkJKIwlCKfJMJkVDDEUHQBMwuR9BNFQsiOGzKzsm0YUSpyxRSjEIHQVAAHdHlJckWGoalaTpAbhrZTlNMImT7K6utHWSm9vMGkaqGygzcv49UTOEhA0NnKzYtPFaL269bnM2sAolQEZaGYUayQpSaaVmOlHue171Kgebxi5Wzls6m61sUvrqD+l63t2r5FQ4oL0ikFrNyUXYlHkDNDEXLJTBOlQXA1EtDDKBQV3wsElutc9azIu7eoep74cBkkPomqafrhgHWXZEHFuk+mSMc5mlL5hGoFYLR4ljfTOOC07IuKWp2AJkmV0MSqTvyfQwqxkndn43QlEujqGfkpL7tc7FUCoSYb058bKW++kiAlfEsQdmBgfMUH2vBq3xehzb7cdqgbz2pXVQa+p3CE6pl3UDC9HNNq6firq3g+CAnjPV1YFofAY9RkSWmUdhMPCk7XAKPjGqyHX9CcZuTS8DoKD4Hz4ASMHvkV8uMmLRQ0LzZCVDKKz9VkYp6hJvISe1Axl2sgiRY+T36EHwLoMTdgDecbJ1HTdMBI3LJZ8MAqKlPjMLO0G+ygt4OSN3nLlakBDqHHlctFqNPWu2x0ybnHiTbCMhMLZlfqLBKa0P77S-hZXif9J5AKTtIABBUVD8Qpo0MoRhdzqFgdnSGTMw4SkQbHaQDVU5oIAVPQowCQqKAsvYHI7BxIUxxqQ2Sq0KHXjtjiaUUBZQQD7grPeCZswFUJuwQoLgKaNTTKhE0BYa7VWqohLQfDrqMwUkI5s1F2yRGocPWQppf5a3QcwzU+pdwGxahUdcOh2AmiUCQzOIsyEGJtizVyaUPJQHMfvHYMhzKE00LUNWptKgnTkHmPip9LLGEaBVPREM-E9SUrNHaITkZD33uwfUy46hY2ri3Nu1UvEbzivw8hhiNquSloDUJCYSknVULxXYlTyjVI0JkkOt1KEugjlAJ2VDCnSNyp06ouCjQVObv0ypgzvH1P0dbBEWISBknablWQhhTIAPVL05ZrdVnm3WVdLJwxc6QH2V-LIpVbC4JcCuXQuhD5Xzrq3VOBgtTlB1suNMQyIyhEeWjIh9RXClQcNFVurhTLyDqFA9xKcyzMM7h4IAA */
   id: "cardGame",
   initial: "setup",
   context: {
@@ -130,9 +107,6 @@ export const cardGameMachine = setup({
     deck: [],
     discardPile: [],
     selectedCards: [],
-    timerStartMs: 0,
-    timerRemainingMs: GAME_TIMING.ROUND_DURATION_MS,
-    pausedAt: null,
     roundScores: {},
     timing: {
       CHECKING_DELAY: GAME_TIMING.CHECKING_DELAY,
@@ -156,22 +130,29 @@ export const cardGameMachine = setup({
 
     roundActive: {
       initial: "playing",
-      always: {
-        guard: "timerExpired",
-        target: "roundEnd",
+      invoke: {
+        id: "timer",
+        src: "timer",
+        input: ({ event }) => {
+          const startEvent = event as Extract<GameEvent, { type: "game.start" }>;
+          return {
+            durationMs: GAME_TIMING.ROUND_DURATION_MS,
+            startMs: startEvent.timestamp,
+            tickIntervalMs: TIMER_TICK_MS,
+          };
+        },
+      },
+      on: {
+        "timer.expired": {
+          target: "roundEnd",
+        },
       },
       states: {
         playing: {
-          invoke: {
-            src: "timer",
-          },
           on: {
-            "timer.tick": {
-              actions: "updateTimer",
-            },
             "round.pause": {
               target: "#cardGame.roundActive.paused",
-              actions: "pauseTimer",
+              actions: "forwardPauseToTimer",
             },
           },
           initial: "playerTurn",
@@ -180,32 +161,54 @@ export const cardGameMachine = setup({
               initial: "checkingCards",
               states: {
                 checkingCards: {
+                  // Decision logic after checking delay
+                  // Order is critical - defensive ordering checks complex cases first:
+                  //
+                  // 1. Win condition (highest priority)
+                  // 2. Multiple matches → player chooses (prevents auto-play when player should decide)
+                  // 3. Single match → auto-play (safe to proceed)
+                  // 4. Deck exhausted → round ends (prevents infinite loop)
+                  // 5. Default → draw card
+                  //
+                  // Rationale: Check multiple before single to prevent bugs where we
+                  // auto-play when player should have choice. Defensive ordering.
+                  //
+                  // Deck Empty Rule: Round ends when deck exhausted to prevent
+                  // infinite loops where no players have matching cards.
                   after: {
-                    checkingDelay: "readyToAct",
-                  },
-                },
-
-                readyToAct: {
-                  entry: "decideNextAction",
-                  on: {
-                    ROUND_END: {
-                      target: "#cardGame.roundEnd",
-                    },
-                    AUTO_PLAY: {
-                      target: "evaluating",
-                      actions: "autoPlaySingleCard",
-                    },
-                    SELECTING_REQUIRED: {
-                      target: "selecting",
-                    },
-                    DRAW_REQUIRED: {
-                      target: "drawing",
-                      actions: "drawCard",
-                    },
+                    checkingDelay: [
+                      // 1. Win condition (highest priority)
+                      {
+                        guard: "currentPlayerHasNoCards",
+                        target: "#cardGame.roundEnd",
+                      },
+                      // 2. Player has choices (let them decide)
+                      {
+                        guard: "hasMultipleValidCards",
+                        target: "selecting",
+                      },
+                      // 3. Auto-play single card
+                      {
+                        guard: "hasSingleValidCard",
+                        target: "evaluating",
+                        actions: "autoPlaySingleCard",
+                      },
+                      // 4. Deck exhausted (can't draw)
+                      {
+                        guard: "deckEmpty",
+                        target: "#cardGame.roundEnd",
+                      },
+                      // 5. Default: must draw
+                      {
+                        target: "drawing",
+                        actions: "drawCard",
+                      },
+                    ],
                   },
                 },
 
                 selecting: {
+                  //no delay as a player can take as long as they want to select cards
                   on: {
                     "card.select": {
                       actions: "selectCard",
@@ -259,7 +262,7 @@ export const cardGameMachine = setup({
           on: {
             "round.resume": {
               target: "#cardGame.roundActive.playing.hist",
-              actions: "resumeTimer",
+              actions: "forwardResumeToTimer",
             },
           },
         },

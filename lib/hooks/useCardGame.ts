@@ -4,6 +4,7 @@ import { useMachine } from '@xstate/react';
 import { useEffect } from 'react';
 import { cardGameMachine } from '@/machines/cardGameMachine';
 import { useTiming } from '@/lib/contexts/TimingContext';
+import { getTimerRemainingMs } from '@/machines/timerHelpers';
 
 /**
  * Primary React hook for accessing card game state machine.
@@ -45,7 +46,11 @@ export function useCardGame() {
   const currentPlayer = snapshot.context.players[snapshot.context.currentPlayerIndex];
   const topDiscard = snapshot.context.discardPile[snapshot.context.discardPile.length - 1];
   const roundDurationMs = snapshot.context.timing.ROUND_DURATION_MS;
-  const timerPercent = (snapshot.context.timerRemainingMs / roundDurationMs) * 100;
+
+  // Timer state comes from timer actor, not context
+  const timerActor = snapshot.children.timer;
+  const timerRemainingMs = getTimerRemainingMs(timerActor);
+  const timerPercent = (timerRemainingMs / roundDurationMs) * 100;
 
   const isSetupState = snapshot.matches('setup');
 
@@ -64,8 +69,8 @@ export function useCardGame() {
     topDiscard,
     selectedCards: snapshot.context.selectedCards,
 
-    // Timer
-    timerRemainingMs: snapshot.context.timerRemainingMs,
+    // Timer (read from timer actor)
+    timerRemainingMs,
     timerPercent,
 
     // Scores

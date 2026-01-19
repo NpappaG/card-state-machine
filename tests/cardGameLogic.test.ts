@@ -43,9 +43,6 @@ function makeContext(overrides: Partial<GameContext> = {}): GameContext {
     deck: overrides.deck ?? [],
     discardPile: overrides.discardPile ?? [makeCard('K')],
     selectedCards: overrides.selectedCards ?? [],
-    timerStartMs: overrides.timerStartMs ?? 0,
-    timerRemainingMs: overrides.timerRemainingMs ?? 180000,
-    pausedAt: overrides.pausedAt ?? null,
     roundScores: overrides.roundScores ?? {},
     timing: overrides.timing ?? {
       CHECKING_DELAY: GAME_TIMING.CHECKING_DELAY,
@@ -338,52 +335,6 @@ describe('currentPlayerHasNoCards', () => {
 });
 
 // ============================================================================
-// Guard Tests: timerExpired
-// ============================================================================
-
-describe('timerExpired', () => {
-  test('returns true when timer is at 0', () => {
-    const context = makeContext({
-      timerRemainingMs: 0,
-    });
-
-    expect(Logic.timerExpired(context)).toBe(true);
-  });
-
-  test('returns true when timer is negative (edge case)', () => {
-    const context = makeContext({
-      timerRemainingMs: -100,
-    });
-
-    expect(Logic.timerExpired(context)).toBe(true);
-  });
-
-  test('returns false when timer has 1ms remaining', () => {
-    const context = makeContext({
-      timerRemainingMs: 1,
-    });
-
-    expect(Logic.timerExpired(context)).toBe(false);
-  });
-
-  test('returns false when timer is at full duration (180 seconds)', () => {
-    const context = makeContext({
-      timerRemainingMs: 180000,
-    });
-
-    expect(Logic.timerExpired(context)).toBe(false);
-  });
-
-  test('returns false when timer has 10 seconds remaining', () => {
-    const context = makeContext({
-      timerRemainingMs: 10000,
-    });
-
-    expect(Logic.timerExpired(context)).toBe(false);
-  });
-});
-
-// ============================================================================
 // Guard Tests: deckEmpty
 // ============================================================================
 
@@ -486,39 +437,9 @@ describe('initializeGameReducer', () => {
     expect(context.currentPlayerIndex).toBeLessThan(3);
   });
 
-  test('initializes timer to 3 minutes (180000ms)', () => {
-    const context = Logic.initializeGameReducer(2);
-    expect(context.timerRemainingMs).toBe(180000);
-  });
-
   test('initializes empty selected cards array', () => {
     const context = Logic.initializeGameReducer(2);
     expect(context.selectedCards).toEqual([]);
-  });
-});
-
-describe('startTimerReducer', () => {
-  test('updates timerStartMs without mutating context', () => {
-    const originalContext = makeContext();
-    const timestamp = 12345;
-    const updatedContext = Logic.startTimerReducer(originalContext, timestamp);
-
-    expect(updatedContext).not.toBe(originalContext);
-    expect(updatedContext.timerStartMs).toBe(timestamp);
-  });
-
-  test('preserves all other context properties', () => {
-    const player1 = makePlayer([makeCard('K')], 'player-1');
-    const originalContext = makeContext({
-      players: [player1],
-      currentPlayerIndex: 0,
-      deck: [makeCard('Q')],
-    });
-
-    const updatedContext = Logic.startTimerReducer(originalContext, 5000);
-
-    expect(updatedContext.players).toBe(originalContext.players);
-    expect(updatedContext.deck).toBe(originalContext.deck);
   });
 });
 
@@ -850,34 +771,6 @@ describe('advanceTurnReducer', () => {
 
     expect(updatedContext.selectedCards).toEqual([]);
     expect(updatedContext.selectedCards).not.toBe(context.selectedCards);
-  });
-});
-
-describe('updateTimerReducer', () => {
-  test('decreases timerRemainingMs without mutation', () => {
-    const startTime = performance.now();
-    const originalContext = makeContext({
-      timerStartMs: startTime - 5000, // 5 seconds elapsed
-      timerRemainingMs: 180000,
-    });
-
-    const updatedContext = Logic.updateTimerReducer(originalContext, startTime);
-
-    expect(updatedContext).not.toBe(originalContext);
-    expect(updatedContext.timerRemainingMs).toBeLessThan(180000);
-    expect(updatedContext.timerRemainingMs).toBeGreaterThanOrEqual(0);
-  });
-
-  test('never goes below 0', () => {
-    const startTime = performance.now();
-    const context = makeContext({
-      timerStartMs: startTime - 200000, // More than 180 seconds elapsed
-      timerRemainingMs: 180000,
-    });
-
-    const updatedContext = Logic.updateTimerReducer(context, startTime);
-
-    expect(updatedContext.timerRemainingMs).toBe(0);
   });
 });
 
