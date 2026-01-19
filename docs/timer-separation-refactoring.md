@@ -18,7 +18,7 @@ Successfully separated timer logic into its own machine with full ownership of t
 - ~~`timerRemainingMs`~~
 - ~~`pausedAt`~~
 
-### 3. Game Logic (`cardGameLogic.ts`)
+### 3. Game Logic (`lib/cardGameLogic.ts`)
 **Removed** timer-related reducers:
 - ~~`startTimerReducer()`~~
 - ~~`updateTimerReducer()`~~
@@ -107,12 +107,12 @@ Timer machine can be tested independently without the game logic.
 
 ## How to Read Timer State
 
-Use the helper functions in `timerHelpers.ts`:
+Use the helper functions in `lib/timerHelpers.ts`:
 
 ### In UI Components
 ```typescript
 import { useSelector } from "@xstate/react";
-import { getTimerRemainingMs, formatTime } from "@/machines/timerHelpers";
+import { getTimerRemainingMs, formatTime } from "@/lib/timerHelpers";
 
 function GameTimer() {
   const remainingMs = useSelector(gameActor, (snapshot) => {

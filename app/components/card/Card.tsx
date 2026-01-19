@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import type { Card as CardType } from '@/lib/types';
+import type { Card as CardType, CardAnimationState } from '@/lib/types';
 import { buildCardAnimationVariants, cardDrawInitialState, buildCardFlipTiming, buildAmberOverlayConfig } from '@/lib/animations/cardAnimations';
 import { useTiming } from '@/lib/contexts/TimingContext';
 
@@ -9,7 +9,7 @@ interface CardProps {
   card: CardType;
   isSelected?: boolean;
   isDisabled?: boolean;
-  animationState?: 'idle' | 'selected' | 'exiting' | 'inHand' | 'entering' | 'autoPlaying' | 'shake';
+  animationState?: CardAnimationState;
   onClick?: () => void;
   layoutId?: string;
   disabled?: boolean;

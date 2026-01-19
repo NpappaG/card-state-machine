@@ -93,7 +93,7 @@ import { setup, assign, sendTo } from "xstate";
 ```
 
 ### 6. Updated `determineNextAction`
-Added documentation note in `cardGameLogic.ts`:
+Added documentation note in `lib/cardGameLogic.ts`:
 
 ```typescript
 /**
@@ -177,7 +177,7 @@ This refactoring chose guards because the decision is a simple if/else chain bas
 
 ## Testing Notes
 
-The `determineNextAction` function in `cardGameLogic.ts` can still be used for unit testing the decision logic independently, but remember it's **not used by the machine** anymore.
+The `determineNextAction` function in `lib/cardGameLogic.ts` can still be used for unit testing the decision logic independently, but remember it's **not used by the machine** anymore.
 
 If you want to test the actual machine behavior, test the guards and transitions directly:
 

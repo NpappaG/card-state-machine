@@ -9,6 +9,15 @@ export type Card = {
   id: string; // unique identifier (e.g., "hearts-A")
 };
 
+export type CardAnimationState =
+  | 'idle'
+  | 'selected'
+  | 'exiting'
+  | 'inHand'
+  | 'entering'
+  | 'autoPlaying'
+  | 'shake';
+
 // Player type
 export type Player = {
   id: string;
@@ -51,5 +60,5 @@ export type GameEvent =
   | { type: 'timer.expired' }
   | { type: 'round.pause'; timestamp: number }
   | { type: 'round.resume'; timestamp: number }
-  | { type: 'game.newRound' }
+  | { type: 'game.newRound'; timestamp: number }
   | { type: 'game.over' };

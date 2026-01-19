@@ -3,28 +3,52 @@
 import { useCardGame } from "@/lib/hooks/useCardGame";
 import { useAnimations } from "@/lib/hooks/useAnimations";
 import { useToast } from "@/lib/contexts/ToastContext";
-import { canPlaySelectedCards } from "@/machines/cardGameLogic";
+import { canPlaySelectedCards } from "@/lib/cardGameLogic";
 import { Card } from "./components/card/Card";
 import { DeckStack } from "./components/deck/DeckStack";
 import { DiscardStack } from "./components/discard/DiscardStack";
 import { StateTreeVisualizer } from "./components/StateTreeVisualizer";
 import { SpeedControls } from "./components/SpeedControls";
 import { LayoutGroup, motion } from "framer-motion";
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 
 export default function GamePage() {
   const game = useCardGame();
   const animations = useAnimations(game);
   const { showToast } = useToast();
   const [playerCount, setPlayerCount] = useState(2);
-  const [debugMode, setDebugMode] = useState(false);
   const [shakingCards, setShakingCards] = useState<Set<string>>(new Set());
 
   // Trigger shake animation on specific cards
-  const triggerShake = (cardIds: string[]) => {
+  const triggerShake = useCallback((cardIds: string[]) => {
     setShakingCards(new Set(cardIds));
     setTimeout(() => setShakingCards(new Set()), 500); // Clear after animation
-  };
+  }, []);
+
+  // Play selected cards - defined early so it can be used in keyboard handler
+  const handlePlayCards = useCallback(() => {
+    if (game.selectedCards.length === 0) return;
+
+    // Check if the play is valid before sending
+    const isValid = canPlaySelectedCards(game.snapshot.context);
+
+    if (!isValid) {
+      // Show feedback for invalid play
+      const topCard = game.topDiscard;
+      const invalidCard = game.selectedCards.find(
+        (card) => card.rank !== topCard?.rank
+      );
+
+      if (invalidCard && topCard) {
+        showToast(`Only ${topCard.rank} cards can be played.`, "error");
+        triggerShake(game.selectedCards.map(c => c.id));
+      }
+      return;
+    }
+
+    // Valid play - send the event
+    game.send({ type: "card.play" });
+  }, [game, showToast, triggerShake]);
 
   // Keyboard shortcuts
   React.useEffect(() => {
@@ -54,14 +78,22 @@ export default function GamePage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [game.isSelecting, game.selectedCards.length, game.isRoundActive, game.isPaused, game.send]);
+  }, [game, handlePlayCards]);
 
   // Start game handler
   const handleStartGame = () => {
     game.send({ type: "game.start", playerCount, timestamp: performance.now() });
   };
 
-  // Card click handler - only one card can be selected at a time
+  const handlePlayAgain = () => {
+    game.send({ type: "game.newRound", timestamp: performance.now() });
+  };
+
+  const handleEndGame = () => {
+    game.send({ type: "game.over" });
+  };
+
+  // Card click handler - multiple matching cards can be selected
   const handleCardClick = (cardId: string) => {
     // If not in selecting state, show feedback
     if (!game.isSelecting) {
@@ -82,35 +114,8 @@ export default function GamePage() {
       // Deselect if clicking the same card
       game.send({ type: "card.deselect", cardId });
     } else if (game.canSelectCard(cardId)) {
-      // Clear previous selection and select new card
-      if (game.selectedCards.length > 0) {
-        game.send({ type: "card.deselect", cardId: game.selectedCards[0].id });
-      }
       game.send({ type: "card.select", cardId });
     }
-  };
-
-  // Play selected cards
-  const handlePlayCards = () => {
-    if (game.selectedCards.length === 0) return;
-
-    // Check if the play is valid before sending
-    const isValid = canPlaySelectedCards(game.snapshot.context);
-
-    if (!isValid) {
-      // Show feedback for invalid play
-      const topCard = game.topDiscard;
-      const selectedCard = game.selectedCards[0];
-
-      if (selectedCard.rank !== topCard.rank) {
-        showToast(`${selectedCard.rank} doesn't match ${topCard.rank}!`, "error");
-        triggerShake(game.selectedCards.map(c => c.id));
-      }
-      return;
-    }
-
-    // Valid play - send the event
-    game.send({ type: "card.play" });
   };
 
   // Format timer display
@@ -261,12 +266,20 @@ export default function GamePage() {
               </div>
             </div>
 
-            <button
-              onClick={handleStartGame}
-              className="mt-4 rounded-lg bg-green-600 px-8 py-4 text-xl font-bold text-white shadow-lg transition-transform hover:scale-105 hover:bg-green-700"
-            >
-              Play Again
-            </button>
+            <div className="mt-4 flex w-full flex-col gap-3">
+              <button
+                onClick={handlePlayAgain}
+                className="rounded-lg bg-green-600 px-8 py-4 text-xl font-bold text-white shadow-lg transition-transform hover:scale-105 hover:bg-green-700"
+              >
+                Play Again
+              </button>
+              <button
+                onClick={handleEndGame}
+                className="rounded-lg bg-gray-200 px-8 py-3 text-base font-semibold text-gray-700 shadow hover:bg-gray-300"
+              >
+                End Game & Return
+              </button>
+            </div>
           </div>
         </div>
       </>
@@ -303,11 +316,11 @@ export default function GamePage() {
         <div className="mb-4 flex items-center justify-between rounded-lg bg-white/90 p-4 shadow-lg backdrop-blur">
           <div className="flex flex-col gap-1">
             <h2 className="text-xl font-bold text-gray-800">
-              {game.currentPlayer?.name}'s Turn
+              {game.currentPlayer?.name}&apos;s Turn
             </h2>
             <p className="text-sm text-gray-600">
               {game.isCheckingCards && "Checking cards..."}
-              {game.isSelecting && "Select a matching card and press Space"}
+              {game.isSelecting && "Select matching cards and press Space"}
               {game.isDrawing && "Drawing a card..."}
               {game.isEvaluating && "Evaluating..."}
               {game.isChangingTurn && "Pass device to next player..."}
@@ -362,7 +375,7 @@ export default function GamePage() {
                   You have multiple options
                 </p>
                 <p className="text-xs text-white/90">
-                  Click + press Space to play
+                  Select card(s) + press Space to play
                 </p>
               </div>
             )}
@@ -373,7 +386,7 @@ export default function GamePage() {
                 onClick={handlePlayCards}
                 className="rounded-lg bg-blue-600 px-6 py-3 text-lg font-bold text-white shadow-lg transition-transform hover:scale-105 hover:bg-blue-700"
               >
-                Play Card
+                {game.selectedCards.length > 1 ? "Play Cards" : "Play Card"}
                 <br />
                 (Space)
               </button>
@@ -453,7 +466,11 @@ export default function GamePage() {
                         card.id
                       );
                       const isSelected = game.isCardSelected(card.id);
-                      const canInteract = isCurrentPlayer && game.isSelecting;
+                      const canInteract =
+                        isCurrentPlayer &&
+                        game.isSelecting &&
+                        (game.isCardSelected(card.id) ||
+                          card.rank === game.topDiscard?.rank);
 
                       // Override with shake if this card should shake
                       if (shakingCards.has(card.id)) {

@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import type { UseCardGameReturn } from './useCardGame';
+import type { CardAnimationState } from '@/lib/types';
 
 /**
  * Animation state derived from game state machine.
@@ -13,42 +14,41 @@ import type { UseCardGameReturn } from './useCardGame';
 export function useAnimations(game: UseCardGameReturn) {
   const [lastPlayedCards, setLastPlayedCards] = useState<string[]>([]);
   const [lastDrawnCard, setLastDrawnCard] = useState<string | null>(null);
-  const [autoPlayingCards, setAutoPlayingCards] = useState<string[]>([]);
 
   // Get dynamic timing from game machine context
   const timing = game.snapshot.context.timing;
 
-  // Detect auto-play during checkingCards phase
-  useEffect(() => {
+  // Detect auto-play during checkingCards phase (derived state, no effect needed)
+  const autoPlayingCards = useMemo(() => {
     if (game.isCheckingCards && game.currentPlayer && game.discardPile.length > 0) {
       const topCard = game.discardPile[game.discardPile.length - 1];
       const matchingCards = game.currentPlayer.hand.filter(c => c.rank === topCard.rank);
 
       // If exactly one matching card, mark it for auto-play animation
       if (matchingCards.length === 1) {
-        setAutoPlayingCards([matchingCards[0].id]);
-      } else {
-        setAutoPlayingCards([]);
+        return [matchingCards[0].id];
       }
-    } else if (!game.isCheckingCards) {
-      // Clear auto-playing cards when we leave checkingCards
-      setAutoPlayingCards([]);
     }
+    return [];
   }, [game.isCheckingCards, game.currentPlayer, game.discardPile]);
 
   // Track cards that were just played (for exit animations)
+  // Only update when entering evaluating state
   useEffect(() => {
     if (game.isEvaluating && game.discardPile.length > 0) {
       const topCards = game.discardPile.slice(-game.selectedCards.length || -1);
       const playedCardIds = topCards.map((c) => c.id);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLastPlayedCards(playedCardIds);
     }
   }, [game.isEvaluating, game.discardPile, game.selectedCards.length]);
 
   // Track cards that were just drawn
+  // Only update when entering drawing state
   useEffect(() => {
     if (game.isDrawing && game.currentPlayer?.hand.length) {
       const lastCard = game.currentPlayer.hand[game.currentPlayer.hand.length - 1];
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLastDrawnCard(lastCard?.id || null);
     }
   }, [game.isDrawing, game.currentPlayer?.hand]);
@@ -94,7 +94,7 @@ export function useAnimations(game: UseCardGameReturn) {
     autoPlayingCards,
 
     // Helpers for common animation patterns
-    getCardAnimationState: (cardId: string) => {
+    getCardAnimationState: (cardId: string): CardAnimationState => {
       if (autoPlayingCards.includes(cardId)) {
         return 'autoPlaying'; // Card is auto-playing (pulse + fling)
       }

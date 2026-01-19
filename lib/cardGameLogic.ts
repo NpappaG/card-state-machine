@@ -7,14 +7,13 @@ import { GAME_TIMING } from '@/lib/constants';
 
 /**
  * Check if selected cards can be played on the current discard pile.
- * Must have exactly one card selected that matches the top discard card rank.
+ * Must have at least one card selected and all must match the top discard rank.
  */
 export function canPlaySelectedCards(context: GameContext): boolean {
-  // Must have exactly one card selected
-  if (context.selectedCards.length !== 1) return false;
-
   const topCard = context.discardPile[context.discardPile.length - 1];
-  return context.selectedCards[0].rank === topCard.rank;
+  if (!topCard || context.selectedCards.length === 0) return false;
+
+  return context.selectedCards.every((card) => card.rank === topCard.rank);
 }
 
 /**
@@ -55,7 +54,7 @@ export function currentPlayerHasNoCards(context: GameContext): boolean {
  * Note: Timer state is now owned by the timer machine.
  * This function is deprecated - use timer actor snapshot instead.
  */
-export function timerExpired(_context: GameContext): boolean {
+export function timerExpired(): boolean {
   // Timer state now lives in timer machine - read from actor snapshot
   return false;
 }
@@ -187,14 +186,35 @@ export function initializeGameReducer(
 }
 
 /**
+ * Reset game state back to setup defaults while preserving timing config.
+ */
+export function resetGameReducer(context: GameContext): GameContext {
+  return {
+    players: [],
+    currentPlayerIndex: 0,
+    deck: [],
+    discardPile: [],
+    selectedCards: [],
+    roundScores: {},
+    timing: context.timing,
+  };
+}
+
+/**
  * Add a card to the selected cards array.
  */
 export function selectCardReducer(context: GameContext, cardId: string): GameContext {
   const currentPlayer = context.players[context.currentPlayerIndex];
   const card = currentPlayer.hand.find((c) => c.id === cardId);
+  const topCard = context.discardPile[context.discardPile.length - 1];
 
   // Card not found or already selected
   if (!card || context.selectedCards.some((c) => c.id === card.id)) {
+    return context;
+  }
+
+  // Can only select cards that match the top discard rank
+  if (!topCard || card.rank !== topCard.rank) {
     return context;
   }
 

@@ -30,16 +30,16 @@ Standard 52-card deck in play.
 
 ### Turn Loop
 
-1. **Auto-play** – If the active player has exactly one card that matches the rank of the top discard card, it is played automatically.
-2. **Selecting** – If multiple cards match the top discard rank, the player can select/deselect those cards and press SPACE/“Play Selected” to place exactly one matching card on the discard pile.
+1. **Selecting** – If multiple cards match the top discard rank, the player can select/deselect those cards and press SPACE/“Play Selected” to place one or more matching cards on the discard pile.
+2. **Auto-play** – If the active player has exactly one card that matches the rank of the top discard card, it is played automatically.
 3. **Drawing** – If no matching cards exist, the player draws one card from the deck. Play immediately advances to the next player.
 
-This loop repeats in player order until a hand empties or the timer expires.
+This loop repeats in player order until a hand empties, the timer expires, or the deck runs out.
 
 ### Controls
 
 - Click a card to select/deselect it when the machine is in the `selecting` state.
-- Press SPACE (or the “Play Selected” button) to confirm the single-card selection.
+- Press SPACE (or the “Play Selected” button) to play the selected cards.
 - Auto-play runs without input whenever only one valid card exists.
 
 ### State Chart Outline
@@ -145,17 +145,18 @@ The `checkingCards` state has a 1000ms delay that applies to ALL branches (auto-
 - Round timer continues during the delay, adding time pressure
 - Auto-play animation still has a predictable window
 
-**Potential optimization:**
-Move most of the delay into an `autoPlaying` branch so selection/drawing can be instantaneous:
+**Current implementation:**
+Uses guarded transitions directly in `checkingCards` for cleaner, more declarative routing:
 
 ```
-checkingCards (instant) → readyToAct
-  ├─ AUTO_PLAY → autoPlaying (1000ms) → evaluating
-  ├─ SELECTING_REQUIRED → selecting (instant)
-  └─ DRAW_REQUIRED → drawing (instant)
+checkingCards (CHECKING_DELAY)
+  ├─ hasMultipleValidCards → selecting
+  ├─ hasSingleValidCard → evaluating (auto-play)
+  ├─ deckEmpty → roundEnd
+  └─ default → drawing
 ```
 
-This would make the game more responsive while maintaining auto-play animation quality. Deferred for future iteration.
+This eliminates internal events and the intermediate `readyToAct` state.
 
 ## State Machine Schema
 
@@ -167,57 +168,74 @@ This would make the game more responsive while maintaining auto-play animation q
 - `currentPlayerIndex`: Index of active player
 - `deck`: Remaining draw pile
 - `discardPile`: Cards that have been played
-- `selectedCards`: Currently highlighted cards (max 1)
-- `timerStartMs`, `timerRemainingMs`: Track 3-minute timer
+- `selectedCards`: Currently highlighted cards (one or more)
 - `roundScores`: Final scores recorded at round end
+- `timing`: Configurable delays for animations
+
+**Note:** Timer state (`remainingMs`, `startMs`) lives in the timer machine actor, not in game context.
 
 ### States
 - `setup`: Await `game.start`
 - `roundActive`
-  - `playerTurn`
-    - `checkingCards`: delay window before acting
-    - `readyToAct`: raises internal decision events
-    - `selecting`: player chooses a matching card
-    - `drawing`: forced draw animation
-    - `evaluating`: check win condition or continue
-    - `changingTurn`: advance to next player
-- `roundEnd`: Scores calculated, wait for restart
+  - `playing`
+    - `playerTurn`
+      - `checkingCards`: evaluates guards after delay, routes to appropriate state
+      - `selecting`: player chooses matching cards (multi-card selection supported)
+      - `drawing`: forced draw animation
+      - `evaluating`: check win condition or continue
+      - `changingTurn`: advance to next player
+    - `hist`: history state for pause/resume
+  - `paused`: game paused, timer frozen
+- `roundEnd`: Scores calculated, can restart round or end game
 
 ### Events
 
-**External Events** (from outside the machine):
-- `game.start` - User starts a new game/round
-- `card.select`, `card.deselect` - User clicks cards in the UI
-- `card.play` - User presses SPACE or "Play Selected" button
-- `timer.tick` - Timer actor sends every second with timestamp
+**External Events:**
+- `game.start` - User starts a new game
+- `game.newRound` - User starts a new round (keeps players, resets deck)
+- `game.over` - User ends game, returns to setup
+- `card.select`, `card.deselect` - User selects/deselects cards
+- `card.play` - User plays selected cards (SPACE key)
+- `round.pause`, `round.resume` - User pauses/resumes game
+- `timer.expired` - Timer machine notifies when time's up
+- `timing.update` - Dynamic timing configuration updates
 
-**Internal Events** (machine talking to itself via `raise()`):
-- `ROUND_END` - Machine detected round should end
-- `AUTO_PLAY` - Machine detected exactly one playable card
-- `SELECTING_REQUIRED` - Machine detected multiple playable cards
-- `DRAW_REQUIRED` - Machine detected no playable cards
-
-**Why both?** The `readyToAct` state is a decision point where the machine examines context and raises an internal event to route itself. External events cross the boundary from user/timer into the machine. Internal events are the machine's way of saying "based on my current state, here's where I should go next" without requiring outside input.
+**Note:** Decision logic (auto-play vs manual selection) is now handled by guards in `checkingCards`, not internal events.
 
 ### Guards
-- `canPlaySelectedCards`: Exactly one selected card matches top discard
-- `currentPlayerHasNoCards`: Active hand is empty
-- `timerExpired`: Timer reached zero
+- `canPlaySelectedCards`: All selected cards match top discard rank
+- `currentPlayerHasNoCards`: Active player's hand is empty (win condition)
+- `hasMultipleValidCards`: Player has 2+ cards matching top discard
+- `hasSingleValidCard`: Player has exactly 1 card matching top discard
+- `deckEmpty`: No cards left to draw (stalemate condition)
 
-- `setup` --`game.start / initializeGame + startTimer`--> `roundActive`
-- `checkingCards` --after `CHECKING_DELAY`--> `readyToAct`
-- `readyToAct` --`AUTO_PLAY / autoPlaySingleCard`--> `evaluating`
-- `readyToAct` --`SELECTING_REQUIRED`--> `selecting`
-- `readyToAct` --`DRAW_REQUIRED`--> `drawing`
+### Key Transitions
+- `setup` --`game.start`--> `roundActive`
+- `checkingCards` --after `CHECKING_DELAY` + guards-->
+  - `hasMultipleValidCards` → `selecting`
+  - `hasSingleValidCard` → `evaluating` (auto-play)
+  - `deckEmpty` → `roundEnd`
+  - default → `drawing`
 - `drawing` --after `DRAW_DELAY`--> `evaluating`
 - `evaluating` --`currentPlayerHasNoCards`--> `roundEnd`
 - `evaluating` --else--> `changingTurn`
+- `roundEnd` --`game.newRound`--> `roundActive` (same players)
+- `roundEnd` --`game.over`--> `setup` (full reset)
 - `changingTurn` --after `TURN_CHANGE_DELAY / advanceTurn`--> `checkingCards`
-- `roundActive` --`timerExpired`--> `roundEnd`
+- `roundActive` --`timer.expired`--> `roundEnd`
 
 ### Actions
-- `initializeGame`, `startTimer`, `decideNextAction`, `selectCard`, `deselectCard`, `playSelectedCards`
-- `autoPlaySingleCard`, `drawCard`, `advanceTurn`, `updateTimer`, `calculateScores`
+- `initializeGame`, `restartRound`, `resetGame`
+- `selectCard`, `deselectCard`, `playSelectedCards`, `autoPlaySingleCard`, `drawCard`, `advanceTurn`
+- `forwardPauseToTimer`, `forwardResumeToTimer`, `calculateScores`, `updateTimingConfig`
+
+## Machines
+
+This app uses two XState machines:
+- `machines/cardGameMachine.ts` orchestrates gameplay and invokes the timer actor.
+- `machines/timerMachine.ts` owns round timing and emits `timer.expired`.
+
+Pure helpers live in `lib/cardGameLogic.ts` (game rules/reducers) and `lib/timerHelpers.ts` (timer actor accessors).
 
 ## Tech Stack
 
@@ -245,6 +263,9 @@ bun run build
 
 - `docs/XSTATE_DOCS.md` - XState v5 reference for context
 - `machines/cardGameMachine.ts` - Main game state machine implementation
+- `machines/timerMachine.ts` - Round timer actor machine
+- `lib/cardGameLogic.ts` - Pure game rules and reducers
+- `lib/timerHelpers.ts` - Timer actor accessors
 - `docs/` for more agent notes
 
 ## My notes on it

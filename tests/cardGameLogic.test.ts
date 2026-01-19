@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'bun:test';
-import * as Logic from '../machines/cardGameLogic';
+import * as Logic from '../lib/cardGameLogic';
 import { GAME_TIMING } from '../lib/constants';
 import type { Card, GameContext, Player, Rank, Suit } from '../lib/types';
 
@@ -80,7 +80,7 @@ describe('canPlaySelectedCards', () => {
     expect(Logic.canPlaySelectedCards(context)).toBe(true);
   });
 
-  test('returns false when multiple cards are selected (only single card allowed)', () => {
+  test('returns true when all selected cards match top discard', () => {
     const topCard = makeCard('Q', 'hearts');
     const selected1 = makeCard('Q', 'spades');
     const selected2 = makeCard('Q', 'diamonds');
@@ -90,16 +90,17 @@ describe('canPlaySelectedCards', () => {
       selectedCards: [selected1, selected2],
     });
 
-    expect(Logic.canPlaySelectedCards(context)).toBe(false);
+    expect(Logic.canPlaySelectedCards(context)).toBe(true);
   });
 
-  test('returns false when selected card has different rank than top discard', () => {
+  test('returns false when any selected card has different rank than top discard', () => {
     const topCard = makeCard('A', 'hearts');
-    const selectedCard = makeCard('K', 'hearts');
+    const selectedCard = makeCard('A', 'clubs');
+    const mismatchedCard = makeCard('K', 'hearts');
 
     const context = makeContext({
       discardPile: [topCard],
-      selectedCards: [selectedCard],
+      selectedCards: [selectedCard, mismatchedCard],
     });
 
     expect(Logic.canPlaySelectedCards(context)).toBe(false);
@@ -450,6 +451,7 @@ describe('selectCardReducer', () => {
     const originalContext = makeContext({
       players: [player],
       selectedCards: [],
+      discardPile: [makeCard('J', 'spades')],
     });
 
     const updatedContext = Logic.selectCardReducer(originalContext, card.id);
@@ -478,6 +480,20 @@ describe('selectCardReducer', () => {
     const originalContext = makeContext({
       players: [player],
       selectedCards: [card],
+      discardPile: [makeCard('Q', 'clubs')],
+    });
+
+    const updatedContext = Logic.selectCardReducer(originalContext, card.id);
+
+    expect(updatedContext).toBe(originalContext);
+  });
+
+  test('returns same context when card does not match top discard', () => {
+    const card = makeCard('9', 'hearts');
+    const player = makePlayer([card]);
+    const originalContext = makeContext({
+      players: [player],
+      discardPile: [makeCard('K', 'spades')],
     });
 
     const updatedContext = Logic.selectCardReducer(originalContext, card.id);
@@ -489,7 +505,10 @@ describe('selectCardReducer', () => {
     const card1 = makeCard('7', 'hearts');
     const card2 = makeCard('7', 'spades');
     const player = makePlayer([card1, card2]);
-    let context = makeContext({ players: [player] });
+    let context = makeContext({
+      players: [player],
+      discardPile: [makeCard('7', 'clubs')],
+    });
 
     context = Logic.selectCardReducer(context, card1.id);
     context = Logic.selectCardReducer(context, card2.id);

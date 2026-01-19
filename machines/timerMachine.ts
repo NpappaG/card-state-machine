@@ -17,8 +17,7 @@ type TimerInput = {
 type TimerEvent =
   | { type: "timer.tick"; timestamp: number }
   | { type: "timer.pause"; timestamp: number }
-  | { type: "timer.resume"; timestamp: number }
-  | { type: "timer.stop" };
+  | { type: "timer.resume"; timestamp: number };
 
 const tickLogic = fromCallback(({ sendBack, input }) => {
   const { tickIntervalMs } = input as { tickIntervalMs: number };
@@ -87,9 +86,6 @@ export const timerMachine = setup({
           target: "paused",
           actions: "pauseTimer",
         },
-        "timer.stop": {
-          target: "stopped",
-        },
       },
       always: {
         guard: "timerExpired",
@@ -103,19 +99,9 @@ export const timerMachine = setup({
           target: "running",
           actions: "resumeTimer",
         },
-        "timer.stop": {
-          target: "stopped",
-        },
       },
     },
     expired: {
-      on: {
-        "timer.stop": {
-          target: "stopped",
-        },
-      },
-    },
-    stopped: {
       type: "final",
     },
   },

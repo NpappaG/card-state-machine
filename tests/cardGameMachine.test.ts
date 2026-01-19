@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { createActor } from 'xstate';
+import { createActor, type StateValue } from 'xstate';
 import { cardGameMachine } from '../machines/cardGameMachine';
 import { GAME_TIMING } from '../lib/constants';
 import type { Card, GameContext, Player, Rank, Suit } from '../lib/types';
@@ -33,7 +33,7 @@ function makePlayer(hand: Card[], id = 'player-1'): Player {
   return { id, name: id, hand, score: 0 };
 }
 
-function buildActor(value: any, context: Partial<GameContext>) {
+function buildActor(value: StateValue, context: Partial<GameContext>) {
   const fullContext: GameContext = {
     players: context.players ?? [makePlayer([])],
     currentPlayerIndex: context.currentPlayerIndex ?? 0,
@@ -105,12 +105,14 @@ test('invalid selection keeps machine in selecting state', () => {
 
 test('card.select adds card to selection when available', () => {
   const card = makeCard('J');
+  const topCard = makeCard('J', 'spades');
   const player = makePlayer([card]);
   const actor = buildActor(
     { roundActive: { playing: { playerTurn: 'selecting' } } },
     {
       players: [player],
       selectedCards: [],
+      discardPile: [topCard],
     }
   );
 
@@ -179,8 +181,9 @@ test('selecting state waits for valid card.play before transitioning', () => {
     }
   );
 
-  // Select one card (only single card selection allowed)
+  // Select multiple matching cards
   actor.send({ type: 'card.select', cardId: match1.id });
+  actor.send({ type: 'card.select', cardId: match2.id });
 
   let snapshot = actor.getSnapshot();
   expect(snapshot.matches({ roundActive: { playing: { playerTurn: 'selecting' } } })).toBe(true);
@@ -194,8 +197,8 @@ test('selecting state waits for valid card.play before transitioning', () => {
   // Should transition out of selecting after valid play
   // (May be in evaluating or changingTurn depending on always transitions)
   expect(snapshot.matches({ roundActive: { playing: { playerTurn: 'selecting' } } })).toBe(false);
-  // One card should be played to discard
-  expect(snapshot.context.discardPile.length).toBe(2);
+  // Two cards should be played to discard
+  expect(snapshot.context.discardPile.length).toBe(3);
 });
 
 // ============================================================================

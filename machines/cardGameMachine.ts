@@ -1,6 +1,6 @@
 import { setup, assign, sendTo } from "xstate";
 import type { GameContext, GameEvent } from "@/lib/types";
-import * as Logic from "./cardGameLogic";
+import * as Logic from "@/lib/cardGameLogic";
 import { GAME_TIMING } from "@/lib/constants";
 import { timerMachine } from "./timerMachine";
 
@@ -8,10 +8,14 @@ const TIMER_TICK_MS = 1000;
 
 type InternalEvent = { type: "timing.update"; timing: GameContext['timing'] };
 
-const startGameTransition = {
-  target: "roundActive",
-  actions: ["initializeGame"],
-} as const;
+const getRoundStartMs = (
+  event: GameEvent | InternalEvent | undefined
+): number => {
+  if (event && (event.type === "game.start" || event.type === "game.newRound")) {
+    return event.timestamp;
+  }
+  return performance.now();
+};
 
 export const cardGameMachine = setup({
   types: {
@@ -22,7 +26,7 @@ export const cardGameMachine = setup({
     timer: timerMachine,
   },
   actions: {
-    // Setup actions - delegating to pure functions from cardGameLogic.ts
+    // Setup actions - delegating to pure functions from lib/cardGameLogic.ts
     initializeGame: assign(({ event, context }) => {
       // Machine structure guarantees this is only called on game.start
       const startEvent = event as Extract<GameEvent, { type: "game.start" }>;
@@ -32,8 +36,18 @@ export const cardGameMachine = setup({
         context.timing
       );
     }),
+    restartRound: assign(({ context }) => {
+      const playerNames = context.players.map((player) => player.name);
+      const playerCount = playerNames.length || 2;
+      return Logic.initializeGameReducer(
+        playerCount,
+        playerNames,
+        context.timing
+      );
+    }),
+    resetGame: assign(({ context }) => Logic.resetGameReducer(context)),
 
-    // Card actions - delegating to pure functions from cardGameLogic.ts
+    // Card actions - delegating to pure functions from lib/cardGameLogic.ts
     selectCard: assign(({ context, event }) => {
       // Machine structure guarantees this is only called on card.select
       const selectEvent = event as Extract<GameEvent, { type: "card.select" }>;
@@ -88,7 +102,7 @@ export const cardGameMachine = setup({
   },
 
   guards: {
-    // Card validation + win validation guards - delegating to pure functions from cardGameLogic.ts
+    // Card validation + win validation guards - delegating to pure functions from lib/cardGameLogic.ts
     canPlaySelectedCards: ({ context }) => Logic.canPlaySelectedCards(context),
     currentPlayerHasNoCards: ({ context }) =>
       Logic.currentPlayerHasNoCards(context),
@@ -124,7 +138,10 @@ export const cardGameMachine = setup({
   states: {
     setup: {
       on: {
-        "game.start": startGameTransition,
+        "game.start": {
+          target: "roundActive",
+          actions: "initializeGame",
+        },
       },
     },
 
@@ -133,14 +150,12 @@ export const cardGameMachine = setup({
       invoke: {
         id: "timer",
         src: "timer",
-        input: ({ event }) => {
-          const startEvent = event as Extract<GameEvent, { type: "game.start" }>;
-          return {
-            durationMs: GAME_TIMING.ROUND_DURATION_MS,
-            startMs: startEvent.timestamp,
-            tickIntervalMs: TIMER_TICK_MS,
-          };
-        },
+        syncSnapshot: true,
+        input: ({ context, event }) => ({
+          durationMs: context.timing.ROUND_DURATION_MS,
+          startMs: getRoundStartMs(event),
+          tickIntervalMs: TIMER_TICK_MS,
+        }),
       },
       on: {
         "timer.expired": {
@@ -177,28 +192,23 @@ export const cardGameMachine = setup({
                   // infinite loops where no players have matching cards.
                   after: {
                     checkingDelay: [
-                      // 1. Win condition (highest priority)
-                      {
-                        guard: "currentPlayerHasNoCards",
-                        target: "#cardGame.roundEnd",
-                      },
-                      // 2. Player has choices (let them decide)
+                      // 1. Player has choices (let them decide)
                       {
                         guard: "hasMultipleValidCards",
                         target: "selecting",
                       },
-                      // 3. Auto-play single card
+                      // 2. Auto-play single card
                       {
                         guard: "hasSingleValidCard",
                         target: "evaluating",
                         actions: "autoPlaySingleCard",
                       },
-                      // 4. Deck exhausted (can't draw)
+                      // 3. Deck exhausted (stalemate - can't draw)
                       {
                         guard: "deckEmpty",
                         target: "#cardGame.roundEnd",
                       },
-                      // 5. Default: must draw
+                      // 4. Default: must draw
                       {
                         target: "drawing",
                         actions: "drawCard",
@@ -253,6 +263,7 @@ export const cardGameMachine = setup({
               },
             },
             hist: {
+              //for pause/resume  to remember where we were
               type: "history",
               history: "deep",
             },
@@ -272,7 +283,14 @@ export const cardGameMachine = setup({
     roundEnd: {
       entry: "calculateScores",
       on: {
-        "game.start": startGameTransition,
+        "game.newRound": {
+          target: "roundActive",
+          actions: "restartRound",
+        },
+        "game.over": {
+          target: "setup",
+          actions: "resetGame",
+        },
       },
     },
   },

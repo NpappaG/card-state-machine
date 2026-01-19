@@ -242,7 +242,7 @@ card-state-machine/
   - Win conditions: Empty hand, timer expires, or deck exhausted
   - Score calculation at round end
 - **Type Safety**: Complete TypeScript types for all entities
-- **Pure Actions**: All context updates are immutable via pure functions in `cardGameLogic.ts`
+- **Pure Actions**: All context updates are immutable via pure functions in `lib/cardGameLogic.ts`
 - **Modern Conventions**: Dot notation events, `performance.now()` timing
 - **UI Components**: Fully implemented React components with Framer Motion animations
 - **Hooks**: `useCardGame` hook provides state matchers and convenience methods
@@ -336,9 +336,11 @@ Current approach is simpler and sufficient for this use case.
 ```
 /machines/
   cardGameMachine.ts   - State machine definition (setup, states, transitions)
-  cardGameLogic.ts     - Pure game logic functions (guards, reducers)
+  timerMachine.ts      - Round timer actor machine
 
 /lib/
+  cardGameLogic.ts     - Pure game logic functions (guards, reducers)
+  timerHelpers.ts      - Timer actor helper functions
   constants.ts         - GAME_TIMING and other constants
   types.ts             - TypeScript types (Card, Player, GameContext, GameEvent)
   /hooks/
@@ -377,7 +379,7 @@ Current approach is simpler and sufficient for this use case.
 ### Adding a New State
 
 1. Update state machine in `machines/cardGameMachine.ts`
-2. Add pure logic functions to `machines/cardGameLogic.ts` if needed
+2. Add pure logic functions to `lib/cardGameLogic.ts` if needed
 3. Export state matcher from `useCardGame.ts`:
    ```typescript
    isNewState: snapshot.matches({ roundActive: { playerTurn: 'newState' } })
@@ -406,7 +408,7 @@ Current approach is simpler and sufficient for this use case.
 ### Testing Pure Logic
 
 ```typescript
-import * as Logic from '@/machines/cardGameLogic';
+import * as Logic from '@/lib/cardGameLogic';
 
 test('should allow playing matching card', () => {
   const context = createMockContext({ /* ... */ });

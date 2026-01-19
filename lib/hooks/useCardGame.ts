@@ -1,10 +1,10 @@
 'use client';
 
-import { useMachine } from '@xstate/react';
+import { useMachine, useSelector } from '@xstate/react';
 import { useEffect } from 'react';
 import { cardGameMachine } from '@/machines/cardGameMachine';
 import { useTiming } from '@/lib/contexts/TimingContext';
-import { getTimerRemainingMs } from '@/machines/timerHelpers';
+import { getTimerRemainingMs } from '@/lib/timerHelpers';
 
 /**
  * Primary React hook for accessing card game state machine.
@@ -48,8 +48,11 @@ export function useCardGame() {
   const roundDurationMs = snapshot.context.timing.ROUND_DURATION_MS;
 
   // Timer state comes from timer actor, not context
-  const timerActor = snapshot.children.timer;
-  const timerRemainingMs = getTimerRemainingMs(timerActor);
+  // Use useSelector to subscribe to timer updates so React re-renders when timer ticks
+  const timerRemainingMs = useSelector(actor, (state) => {
+    const timerActor = state.children.timer;
+    return getTimerRemainingMs(timerActor);
+  });
   const timerPercent = (timerRemainingMs / roundDurationMs) * 100;
 
   const isSetupState = snapshot.matches('setup');
@@ -91,9 +94,11 @@ export function useCardGame() {
 
     // Convenience methods
     canSelectCard: (cardId: string) => {
-      if (!currentPlayer) return false;
-      return currentPlayer.hand.some((c) => c.id === cardId) &&
-             !snapshot.context.selectedCards.some((c) => c.id === cardId);
+      if (!currentPlayer || !topDiscard) return false;
+      const card = currentPlayer.hand.find((c) => c.id === cardId);
+      if (!card) return false;
+      if (card.rank !== topDiscard.rank) return false;
+      return !snapshot.context.selectedCards.some((c) => c.id === cardId);
     },
 
     isCardSelected: (cardId: string) => {
