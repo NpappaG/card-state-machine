@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import type { UseCardGameReturn } from './useCardGame';
 import type { CardAnimationState } from '@/lib/types';
 
@@ -14,6 +14,11 @@ import type { CardAnimationState } from '@/lib/types';
 export function useAnimations(game: UseCardGameReturn) {
   const [lastPlayedCards, setLastPlayedCards] = useState<string[]>([]);
   const [lastDrawnCard, setLastDrawnCard] = useState<string | null>(null);
+
+  // Track previous state values to detect transitions
+  const prevIsEvaluating = useRef(false);
+  const prevIsDrawing = useRef(false);
+  const prevDiscardPileLength = useRef(game.discardPile.length);
 
   // Get dynamic timing from game machine context
   const timing = game.snapshot.context.timing;
@@ -33,24 +38,34 @@ export function useAnimations(game: UseCardGameReturn) {
   }, [game.isAutoPlaying, game.currentPlayer, game.discardPile]);
 
   // Track cards that were just played (for exit animations)
-  // Only update when entering evaluating state
+  // Only update when transitioning INTO evaluating state (false -> true)
   useEffect(() => {
-    if (game.isEvaluating && game.discardPile.length > 0) {
-      const topCards = game.discardPile.slice(-game.selectedCards.length || -1);
-      const playedCardIds = topCards.map((c) => c.id);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLastPlayedCards(playedCardIds);
+    if (game.isEvaluating && !prevIsEvaluating.current) {
+      // Capture only when new cards were added to the discard pile.
+      const cardsAdded = game.discardPile.length - prevDiscardPileLength.current;
+
+      if (cardsAdded > 0) {
+        const topCards = game.discardPile.slice(-cardsAdded);
+        const playedCardIds = topCards.map((c) => c.id);
+        setLastPlayedCards(playedCardIds);
+      } else {
+        setLastPlayedCards([]);
+      }
     }
-  }, [game.isEvaluating, game.discardPile, game.selectedCards.length]);
+    prevIsEvaluating.current = game.isEvaluating;
+    prevDiscardPileLength.current = game.discardPile.length;
+  }, [game.isEvaluating, game.discardPile]);
 
   // Track cards that were just drawn
-  // Only update when entering drawing state
+  // Only update when transitioning INTO drawing state (false -> true)
   useEffect(() => {
-    if (game.isDrawing && game.currentPlayer?.hand.length) {
+    if (game.isDrawing && !prevIsDrawing.current && game.currentPlayer?.hand.length) {
       const lastCard = game.currentPlayer.hand[game.currentPlayer.hand.length - 1];
+      // Safe: only updates on state transition (false -> true), not on every render
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setLastDrawnCard(lastCard?.id || null);
     }
+    prevIsDrawing.current = game.isDrawing;
   }, [game.isDrawing, game.currentPlayer?.hand]);
 
   // Clear after animation window

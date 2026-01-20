@@ -21,16 +21,26 @@ export function StateTreeVisualizer({ currentState, game }: StateTreeVisualizerP
 
   // Read from localStorage after hydration
   useEffect(() => {
-    const stored = localStorage.getItem('xstate-visualizer-collapsed');
-    if (stored !== null) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- Legitimate pattern to sync with localStorage after SSR hydration
-      setIsCollapsed(stored === 'true');
+    try {
+      const stored = localStorage.getItem('xstate-visualizer-collapsed');
+      if (stored !== null) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- Legitimate pattern to sync with localStorage after SSR hydration
+        setIsCollapsed(stored === 'true');
+      }
+    } catch (error) {
+      // localStorage may be disabled (private browsing) or throw errors
+      console.warn('Failed to read from localStorage:', error);
     }
   }, []); // Run once on mount
 
   // Persist collapse state to localStorage
   useEffect(() => {
-    localStorage.setItem('xstate-visualizer-collapsed', String(isCollapsed));
+    try {
+      localStorage.setItem('xstate-visualizer-collapsed', String(isCollapsed));
+    } catch (error) {
+      // localStorage may be disabled or quota exceeded
+      console.warn('Failed to write to localStorage:', error);
+    }
   }, [isCollapsed]);
   const stateValue = typeof currentState === 'object' ? JSON.stringify(currentState) : String(currentState);
 

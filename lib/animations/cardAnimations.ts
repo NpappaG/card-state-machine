@@ -1,6 +1,16 @@
 import { GAME_TIMING } from '@/lib/constants';
 
 /**
+ * Animation phase percentages for auto-play timing.
+ * These define how the animation is divided into phases:
+ * - Lift: Card rises with scale increase (20% of duration)
+ * - Settle: Card settles into ready position (15% of duration)
+ * - Hold: Card holds position waiting to be played (65% of duration - implicit)
+ */
+const ANIMATION_LIFT_PHASE_PERCENT = 0.20;
+const ANIMATION_SETTLE_PHASE_PERCENT = 0.15;
+
+/**
  * Build autoPlaying animation with timing calculated from AUTO_PLAY_DELAY
  * Phases: Lift (20%) → Settle (15%) → Hold (65%)
  * All phases scale proportionally with the total duration
@@ -8,14 +18,9 @@ import { GAME_TIMING } from '@/lib/constants';
 function buildAutoPlayingAnimation(autoPlayDelay: number = GAME_TIMING.AUTO_PLAY_DELAY) {
   const totalDuration = autoPlayDelay; // in ms
 
-  // Proportional phase percentages (instead of fixed milliseconds)
-  const liftPercent = 0.20;    // 20% for lift
-  const settlePercent = 0.15;  // 15% for settle
-  // holdPercent = 0.65 (65% for hold - implicit)
-
   // Calculate keyframe positions
-  const liftEnd = liftPercent;
-  const settleEnd = liftPercent + settlePercent;
+  const liftEnd = ANIMATION_LIFT_PHASE_PERCENT;
+  const settleEnd = ANIMATION_LIFT_PHASE_PERCENT + ANIMATION_SETTLE_PHASE_PERCENT;
 
   return {
     scale: [1, 1.1, 1.08, 1.08],
@@ -151,12 +156,9 @@ export const CARD_FLIP_TIMING = buildCardFlipTiming();
 export function buildAmberOverlayConfig(autoPlayDelay: number = GAME_TIMING.AUTO_PLAY_DELAY) {
   const totalDuration = autoPlayDelay; // in ms
 
-  // Proportional phase percentages (matching autoPlaying animation)
-  const liftPercent = 0.20;
-  const settlePercent = 0.15;
-
-  const liftEnd = liftPercent;
-  const settleEnd = liftPercent + settlePercent;
+  // Calculate keyframe positions (matching autoPlaying animation)
+  const liftEnd = ANIMATION_LIFT_PHASE_PERCENT;
+  const settleEnd = ANIMATION_LIFT_PHASE_PERCENT + ANIMATION_SETTLE_PHASE_PERCENT;
 
   return {
     opacity: [0, 0.45, 0.4, 0.4],

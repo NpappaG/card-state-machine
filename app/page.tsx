@@ -2,20 +2,17 @@
 
 import { useCardGame } from "@/lib/hooks/useCardGame";
 import { useAnimations } from "@/lib/hooks/useAnimations";
-import { useToast } from "@/lib/contexts/ToastContext";
-import { canPlaySelectedCards } from "@/lib/cardGameLogic";
-import { Card } from "./components/card/Card";
-import { DeckStack } from "./components/deck/DeckStack";
-import { DiscardStack } from "./components/discard/DiscardStack";
-import { StateTreeVisualizer } from "./components/StateTreeVisualizer";
-import { SpeedControls } from "./components/SpeedControls";
+import { Card } from "./components/ui/Card";
+import { DeckStack } from "./components/ui/DeckStack";
+import { DiscardStack } from "./components/ui/DiscardStack";
+import { StateTreeVisualizer } from "./components/visualizers/StateTreeVisualizer";
+import { SpeedControls } from "./components/visualizers/SpeedControls";
 import { LayoutGroup, motion } from "framer-motion";
 import React, { useState, useCallback } from "react";
 
 export default function GamePage() {
   const game = useCardGame();
   const animations = useAnimations(game);
-  const { showToast } = useToast();
   const [playerCount, setPlayerCount] = useState(2);
   const [shakingCards, setShakingCards] = useState<Set<string>>(new Set());
 
@@ -29,26 +26,10 @@ export default function GamePage() {
   const handlePlayCards = useCallback(() => {
     if (game.selectedCards.length === 0) return;
 
-    // Check if the play is valid before sending
-    const isValid = canPlaySelectedCards(game.snapshot.context);
-
-    if (!isValid) {
-      // Show feedback for invalid play
-      const topCard = game.topDiscard;
-      const invalidCard = game.selectedCards.find(
-        (card) => card.rank !== topCard?.rank
-      );
-
-      if (invalidCard && topCard) {
-        showToast(`Only ${topCard.rank} cards can be played.`, "error");
-        triggerShake(game.selectedCards.map(c => c.id));
-      }
-      return;
-    }
-
-    // Valid play - send the event
+    // Note: Selection logic prevents invalid cards from being selected,
+    // so all selected cards are guaranteed to be valid
     game.send({ type: "card.play" });
-  }, [game, showToast, triggerShake]);
+  }, [game]);
 
   // Keyboard shortcuts
   React.useEffect(() => {
@@ -82,7 +63,11 @@ export default function GamePage() {
 
   // Start game handler
   const handleStartGame = () => {
-    game.send({ type: "game.start", playerCount, timestamp: performance.now() });
+    game.send({
+      type: "game.start",
+      playerCount,
+      timestamp: performance.now(),
+    });
   };
 
   const handlePlayAgain = () => {
@@ -95,17 +80,8 @@ export default function GamePage() {
 
   // Card click handler - multiple matching cards can be selected
   const handleCardClick = (cardId: string) => {
-    // If not in selecting state, show feedback
+    // If not in selecting state, provide visual feedback via shake
     if (!game.isSelecting) {
-      if (game.isCheckingCards) {
-        showToast("Please wait while checking your cards...", "info");
-      } else if (game.isDrawing) {
-        showToast("Drawing a card...", "info");
-      } else if (game.isEvaluating) {
-        showToast("Evaluating the play...", "info");
-      } else if (game.isChangingTurn) {
-        showToast("Turn is changing...", "info");
-      }
       triggerShake([cardId]);
       return;
     }
@@ -159,16 +135,14 @@ export default function GamePage() {
             </p>
             <ul className="text-sm text-gray-600 list-disc list-inside text-left space-y-2 max-w-sm">
               <li>
-                <strong>Objective:</strong> Be the first to discard all cards, or
-                have the lowest score when the timer ends.
+                <strong>Objective:</strong> Be the first to discard all cards,
+                or have the lowest score when the timer ends.
               </li>
               <li>
-                <strong>Card Play:</strong> Match a card's rank to the top card
+                <strong>Card Play:</strong> Match a card&apos;s rank to the top card
                 of the discard pile.
               </li>
-              <li>
-                If you can't play a card, you must draw from the deck.
-              </li>
+              <li>If you can&apos;t play a card, you must draw from the deck.</li>
             </ul>
 
             <div className="flex flex-col gap-3">
@@ -210,7 +184,7 @@ export default function GamePage() {
   // Render round end state
   if (game.isRoundEnd) {
     const sortedScores = Object.entries(game.roundScores).sort(
-      ([, a], [, b]) => a - b
+      ([, a], [, b]) => a - b,
     );
     const [winnerId, winnerScore] = sortedScores[0];
     const winner = game.players.find((p) => p.id === winnerId);
@@ -263,10 +237,10 @@ export default function GamePage() {
                         {idx === 0
                           ? "🥇"
                           : idx === 1
-                          ? "🥈"
-                          : idx === 2
-                          ? "🥉"
-                          : ""}{" "}
+                            ? "🥈"
+                            : idx === 2
+                              ? "🥉"
+                              : ""}{" "}
                         {player?.name}
                       </span>
                       <span className="text-gray-700">{score} pts</span>
@@ -350,7 +324,9 @@ export default function GamePage() {
               aria-label={game.isPaused ? "Resume game" : "Pause game"}
             >
               <span className="text-xl">{game.isPaused ? "▶️" : "⏸"}</span>
-              <span className="text-sm font-medium">{game.isPaused ? "Resume" : "Pause"}</span>
+              <span className="text-sm font-medium">
+                {game.isPaused ? "Resume" : "Pause"}
+              </span>
             </button>
 
             {/* Timer */}
@@ -361,8 +337,8 @@ export default function GamePage() {
                 animations.isTimerCritical
                   ? "bg-red-600 text-white"
                   : animations.isTimerLow
-                  ? "bg-yellow-500 text-white"
-                  : "bg-blue-600 text-white"
+                    ? "bg-yellow-500 text-white"
+                    : "bg-blue-600 text-white"
               }
             `}
             >
@@ -382,10 +358,10 @@ export default function GamePage() {
             {game.isSelecting && game.selectedCards.length === 0 && (
               <div className="rounded-lg bg-yellow-500/90 px-6 py-3 text-center shadow-lg">
                 <p className="text-sm font-semibold text-white">
-                  You have multiple options
+                  You have multiple {game.topDiscard?.rank} cards
                 </p>
                 <p className="text-xs text-white/90">
-                  Select card(s) + press Space to play
+                  Select one or more + press Space to play
                 </p>
               </div>
             )}
@@ -445,13 +421,13 @@ export default function GamePage() {
 
           {/* Players' hands */}
           <div className="flex flex-col gap-4">
-                                {game.players.map((player, idx) => {
-                                  const isCurrentPlayer = idx === game.currentPlayerIndex;
-            
-                                  return (
-                                    <div
-                                      key={player.id}
-                                      className={`
+            {game.players.map((player, idx) => {
+              const isCurrentPlayer = idx === game.currentPlayerIndex;
+
+              return (
+                <div
+                  key={player.id}
+                  className={`
                               rounded-lg p-4 transition-colors
                               ${
                                 isCurrentPlayer
@@ -459,54 +435,53 @@ export default function GamePage() {
                                   : "bg-white/10"
                               }
                             `}
-                                    >
-                                      <div className="mb-2 flex items-center justify-between">
-                                        <h3 className="text-lg font-semibold text-white">
-                                          {player.name}
-                                        </h3>
-                                        <span className="text-sm text-white/80">
-                                          {player.hand.length} cards
-                                        </span>
-                                      </div>
-            
-                                      {/* Player's hand */}
-                                      <div className="flex flex-wrap gap-2">
-                                        {player.hand.map((card) => {
-                                          let animState = animations.getCardAnimationState(
-                                            card.id
-                                          );
-                                          const isSelected = game.isCardSelected(card.id);
-                                          const canInteract =
-                                            isCurrentPlayer &&
-                                            game.isSelecting &&
-                                            (game.isCardSelected(card.id) ||
-                                              card.rank === game.topDiscard?.rank);
-            
-                                          // Override with shake if this card should shake
-                                          if (shakingCards.has(card.id)) {
-                                            animState = 'shake';
-                                          }
-            
-                                          // Determine if card should be face down
-                                          const renderFaceDown = !isCurrentPlayer;
-            
-                                          return (
-                                            <Card
-                                              key={card.id}
-                                              card={card}
-                                              isSelected={isSelected}
-                                              isDisabled={!canInteract}
-                                              animationState={animState}
-                                              onClick={() => handleCardClick(card.id)}
-                                              layoutId={card.id}
-                                              faceDown={renderFaceDown} // Pass the new prop
-                                            />
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-                                  );
-                                })}          </div>
+                >
+                  <div className="mb-2 flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-white">
+                      {player.name}
+                    </h3>
+                    <span className="text-sm text-white/80">
+                      {player.hand.length} cards
+                    </span>
+                  </div>
+
+                  {/* Player's hand */}
+                  <div className="flex flex-wrap gap-2">
+                    {player.hand.map((card) => {
+                      let animState = animations.getCardAnimationState(card.id);
+                      const isSelected = game.isCardSelected(card.id);
+                      const canInteract =
+                        isCurrentPlayer &&
+                        game.isSelecting &&
+                        (game.isCardSelected(card.id) ||
+                          card.rank === game.topDiscard?.rank);
+
+                      // Override with shake if this card should shake
+                      if (shakingCards.has(card.id)) {
+                        animState = "shake";
+                      }
+
+                      // Determine if card should be face down
+                      const renderFaceDown = !isCurrentPlayer;
+
+                      return (
+                        <Card
+                          key={card.id}
+                          card={card}
+                          isSelected={isSelected}
+                          isDisabled={!canInteract}
+                          animationState={animState}
+                          onClick={() => handleCardClick(card.id)}
+                          layoutId={card.id}
+                          faceDown={renderFaceDown} // Pass the new prop
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}{" "}
+          </div>
         </div>
 
         {/* Pause Overlay */}
@@ -523,10 +498,15 @@ export default function GamePage() {
             <div className="flex flex-col items-center gap-6 rounded-xl bg-white p-8 shadow-2xl">
               <div className="text-6xl">⏸</div>
               <h2 className="text-3xl font-bold text-gray-800">Game Paused</h2>
-              <p className="text-gray-600">Click anywhere or press Escape to continue</p>
+              <p className="text-gray-600">
+                Click anywhere or press Escape to continue
+              </p>
               <button
                 onClick={() =>
-                  game.send({ type: "round.resume", timestamp: performance.now() })
+                  game.send({
+                    type: "round.resume",
+                    timestamp: performance.now(),
+                  })
                 }
                 className="rounded-lg bg-green-600 px-8 py-4 text-xl font-bold text-white shadow-lg transition-transform hover:scale-105 hover:bg-green-700"
               >

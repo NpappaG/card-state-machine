@@ -51,7 +51,8 @@ export const timerMachine = setup({
     resumeTimer: assign(({ context, event }) => {
       if (event.type !== "timer.resume") return {};
       if (context.pausedAt === null) return {};
-      const pausedDuration = event.timestamp - context.pausedAt;
+      // Guard against negative durations (e.g., system clock changes)
+      const pausedDuration = Math.max(0, event.timestamp - context.pausedAt);
       return {
         startMs: context.startMs + pausedDuration,
         pausedAt: null,

@@ -27,6 +27,3 @@ Multiple Card Selection: When multiple valid cards are available:
 
 - Click cards to select/deselect them
 - SPACE key to play all selected cards as together
-
-### Urgency
-This is a repo for a takehome coding challenge at a company I'm interviewing for and the reviewer is an Xstate expert we want to impress

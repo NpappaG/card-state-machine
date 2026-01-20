@@ -40,12 +40,10 @@ function buildActor(value: StateValue, context: Partial<GameContext>) {
     deck: context.deck ?? [],
     discardPile: context.discardPile ?? [],
     selectedCards: context.selectedCards ?? [],
-    timerStartMs: context.timerStartMs ?? 0,
-    timerRemainingMs: context.timerRemainingMs ?? 180000,
-    pausedAt: context.pausedAt ?? null,
     roundScores: context.roundScores ?? {},
     timing: context.timing ?? {
       CHECKING_DELAY: GAME_TIMING.CHECKING_DELAY,
+      AUTO_PLAY_DELAY: GAME_TIMING.AUTO_PLAY_DELAY,
       DRAW_DELAY: GAME_TIMING.DRAW_DELAY,
       EVALUATING_DELAY: GAME_TIMING.EVALUATING_DELAY,
       TURN_CHANGE_DELAY: GAME_TIMING.TURN_CHANGE_DELAY,

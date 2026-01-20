@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Card } from '../card/Card';
+import { Card } from '../ui/Card';
 import type { Card as CardType } from '@/lib/types';
 
 interface DiscardStackProps {

@@ -34,6 +34,7 @@ export function useCardGame() {
         ROUND_DURATION_MS: timing.ROUND_DURATION_MS,
       },
     });
+    // Note: `send` is stable in XState but included for linter satisfaction
   }, [
     timing.CHECKING_DELAY,
     timing.AUTO_PLAY_DELAY,

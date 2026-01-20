@@ -24,6 +24,8 @@ export function hasMultipleValidCards(context: GameContext): boolean {
   const currentPlayer = context.players[context.currentPlayerIndex];
   const topCard = context.discardPile[context.discardPile.length - 1];
 
+  if (!currentPlayer || !topCard) return false;
+
   const validCards = currentPlayer.hand.filter((card) => card.rank === topCard.rank);
   return validCards.length > 1;
 }
@@ -36,6 +38,8 @@ export function hasSingleValidCard(context: GameContext): boolean {
   const currentPlayer = context.players[context.currentPlayerIndex];
   const topCard = context.discardPile[context.discardPile.length - 1];
 
+  if (!currentPlayer || !topCard) return false;
+
   const validCards = currentPlayer.hand.filter((card) => card.rank === topCard.rank);
   return validCards.length === 1;
 }
@@ -46,6 +50,7 @@ export function hasSingleValidCard(context: GameContext): boolean {
  */
 export function currentPlayerHasNoCards(context: GameContext): boolean {
   const currentPlayer = context.players[context.currentPlayerIndex];
+  if (!currentPlayer) return false;
   return currentPlayer.hand.length === 0;
 }
 
@@ -161,6 +166,7 @@ export function initializeGameReducer(
   playerNames?: string[],
   timing: GameContext['timing'] = {
     CHECKING_DELAY: GAME_TIMING.CHECKING_DELAY,
+    AUTO_PLAY_DELAY: GAME_TIMING.AUTO_PLAY_DELAY,
     DRAW_DELAY: GAME_TIMING.DRAW_DELAY,
     EVALUATING_DELAY: GAME_TIMING.EVALUATING_DELAY,
     TURN_CHANGE_DELAY: GAME_TIMING.TURN_CHANGE_DELAY,
@@ -285,6 +291,8 @@ export function playSelectedCardsReducer(context: GameContext): GameContext {
 export function autoPlaySingleCardReducer(context: GameContext): GameContext {
   const currentPlayer = context.players[context.currentPlayerIndex];
   const topCard = context.discardPile[context.discardPile.length - 1];
+
+  if (!currentPlayer || !topCard) return context;
 
   // Find the single valid card
   const validCard = currentPlayer.hand.find((card) => card.rank === topCard.rank);

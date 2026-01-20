@@ -6,7 +6,7 @@
  */
 
 import type { ActorRefFrom } from "xstate";
-import type { timerMachine } from "./timerMachine";
+import type { timerMachine } from "@/machines/timerMachine";
 
 type TimerActor = ActorRefFrom<typeof timerMachine>;
 
