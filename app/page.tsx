@@ -109,7 +109,7 @@ export default function GamePage() {
         {/* Bottom right controls */}
         <div className="fixed right-4 bottom-4 z-50 flex items-end gap-4">
           <SpeedControls />
-          <StateTreeVisualizer currentState={game.snapshot.value} game={game} />
+          <StateTreeVisualizer game={game} />
         </div>
 
         {/* GitHub link - Bottom left */}
@@ -194,7 +194,7 @@ export default function GamePage() {
         {/* Bottom right controls */}
         <div className="fixed right-4 bottom-4 z-50 flex items-end gap-4">
           <SpeedControls />
-          <StateTreeVisualizer currentState={game.snapshot.value} game={game} />
+          <StateTreeVisualizer game={game} />
         </div>
 
         {/* GitHub link - Bottom left */}
@@ -212,13 +212,15 @@ export default function GamePage() {
 
         <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-green-700 to-green-900 p-4">
           <div className="flex flex-col items-center gap-6 rounded-xl bg-white p-8 shadow-2xl">
-            <h1 className="text-4xl font-bold text-gray-800">Round Over!</h1>
+            <h1 className="text-4xl font-bold text-gray-800">Game Over!</h1>
 
             <div className="flex flex-col gap-3">
               <h2 className="text-2xl font-semibold text-green-600">
                 🏆 {winner?.name} Wins!
               </h2>
-              <p className="text-gray-600">Score: {winnerScore} points</p>
+              <p className="text-sm text-gray-500">
+                Lowest Score: {winnerScore} points
+              </p>
             </div>
 
             <div className="w-full rounded-lg bg-gray-50 p-4">
@@ -255,13 +257,13 @@ export default function GamePage() {
                 onClick={handlePlayAgain}
                 className="rounded-lg bg-green-600 px-8 py-4 text-xl font-bold text-white shadow-lg transition-transform hover:scale-105 hover:bg-green-700"
               >
-                Play Again
+                Play Again (same setup)
               </button>
               <button
                 onClick={handleEndGame}
                 className="rounded-lg bg-gray-200 px-8 py-3 text-base font-semibold text-gray-700 shadow hover:bg-gray-300"
               >
-                End Game & Return
+                Back to Menu
               </button>
             </div>
           </div>
@@ -279,7 +281,7 @@ export default function GamePage() {
         <SpeedControls />
 
         {/* State Tree Visualizer - Right side */}
-        <StateTreeVisualizer currentState={game.snapshot.value} game={game} />
+        <StateTreeVisualizer game={game} />
       </div>
 
       {/* GitHub link - Bottom left */}
