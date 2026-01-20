@@ -1,4 +1,9 @@
-import { assign, fromCallback, sendParent, setup } from "xstate";
+import { assign, fromCallback, sendTo, setup, type ActorRef, type Snapshot } from "xstate";
+
+// Type for the parent actor (cardGameMachine)
+// Parent can receive timer.expired events
+type ParentEvent = { type: "timer.expired" };
+type ParentActor = ActorRef<Snapshot<unknown>, ParentEvent>;
 
 type TimerContext = {
   durationMs: number;
@@ -6,12 +11,14 @@ type TimerContext = {
   startMs: number;
   pausedAt: number | null;
   tickIntervalMs: number;
+  parentRef: ParentActor;
 };
 
 type TimerInput = {
   durationMs: number;
   startMs: number;
   tickIntervalMs: number;
+  parentRef: ParentActor;
 };
 
 type TimerEvent =
@@ -63,7 +70,10 @@ export const timerMachine = setup({
         pausedAt: null,
       };
     }),
-    notifyExpired: sendParent({ type: "timer.expired" }),
+    notifyExpired: sendTo(
+      ({ context }) => context.parentRef,
+      { type: "timer.expired" }
+    ),
   },
   guards: {
     timerExpired: ({ context }) => context.remainingMs <= 0,
@@ -76,6 +86,7 @@ export const timerMachine = setup({
     startMs: input.startMs,
     pausedAt: null,
     tickIntervalMs: input.tickIntervalMs,
+    parentRef: input.parentRef,
   }),
   initial: "running",
   states: {

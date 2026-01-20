@@ -216,6 +216,46 @@ Xstate gives you a ton (and sometime frustrating amount) of flexibility on model
 
 **Solution:** Separated into `timerMachine` and `gameMachine` and while I was at it I added pause/play. The main game machine invokes this actor and only listens for a single `timer.expired` event. All timer-related state (remaining time, pause state) is owned exclusively by the timer actor.
 
+**Deep Dive - Why This Approach:**
+
+**Why a Separate Machine (not `fromCallback`):**
+- Timer has distinct lifecycle states: `running`, `paused`, `expired`
+- Pause/resume requires complex time tracking (accumulating pause duration, recalculating start time)
+- State machine visualization makes timer logic inspectable and debuggable
+- Better demonstrates XState v5 actor composition patterns for code review
+
+**Why `invoke` (not `spawn`):**
+- **Automatic lifecycle**: Timer created on `roundActive` entry, destroyed on exit
+- **Declarative**: State definition shows what actors exist at any given time
+- **No memory leaks**: XState handles cleanup automatically
+- **Correct semantics**: Timer lifetime is coupled to `roundActive` state - when the round ends, the timer should cease to exist
+
+**Why `input` for `parentRef` (not events):**
+- **Initialization data**: Parent reference needed from the moment timer is created
+- **No race conditions**: Parent ref available immediately, before any events could be processed
+- **Type safety**: `parentRef` is never nullable in timer context
+- **Cleaner code**: No event handling boilerplate just to initialize a reference
+
+**Why `sendTo` (not `sendParent`):**
+- XState v5 best practice: explicit actor references preferred over implicit parent lookup
+- Type-safe: TypeScript knows exactly what events the parent accepts
+- More flexible: Same actor could notify multiple targets if needed
+- Future-proof: `sendParent` is a convenience pattern, `sendTo` is the foundational primitive
+
+**Why `syncSnapshot: true` is Critical:**
+- **React observes snapshots, not events**: `useSelector` hook subscribes to actor snapshots
+- **Child updates don't propagate by default**: Timer's `remainingMs` changes every second, but parent snapshot wouldn't update
+- **Without it**: Timer ticks internally but UI freezes (parent snapshot stale)
+- **With it**: Every timer tick creates new parent snapshot → `useSelector` fires → React re-renders
+
+**Pause/Resume Behavior:**
+- Uses XState history states (`hist: { type: 'history', history: 'deep' }`)
+- Resuming restores state path but restarts `after` delays from scratch
+- **Trade-off accepted**: For short game animations (200-1000ms), restarting delays is acceptable
+- Alternative would require complex elapsed-time tracking in every state's context
+
+This architecture demonstrates production-ready XState v5 patterns: actor composition, explicit communication via `sendTo`, proper lifecycle management with `invoke`, and React integration via `syncSnapshot`.
+
 ## Tech Stack
 
 - **State Management**: XState v5 (Actor Model)
