@@ -53,8 +53,13 @@ export const timerMachine = setup({
       if (context.pausedAt === null) return {};
       // Guard against negative durations (e.g., system clock changes)
       const pausedDuration = Math.max(0, event.timestamp - context.pausedAt);
+      const newStartMs = context.startMs + pausedDuration;
+      // Recalculate remainingMs immediately so UI shows correct time
+      const elapsed = event.timestamp - newStartMs;
+      const remainingMs = Math.max(0, context.durationMs - elapsed);
       return {
-        startMs: context.startMs + pausedDuration,
+        startMs: newStartMs,
+        remainingMs,
         pausedAt: null,
       };
     }),

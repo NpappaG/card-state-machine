@@ -289,6 +289,9 @@ export const cardGameMachine = setup({
             "round.resume": {
               target: "#cardGame.roundActive.playing.hist",
               actions: "forwardResumeToTimer",
+              // Note: Resuming will restart any `after` delays in the restored state.
+              // This is XState's expected behavior - history preserves state path,
+              // not elapsed delay time. Acceptable for short game animations.
             },
           },
         },

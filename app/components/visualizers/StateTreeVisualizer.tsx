@@ -49,7 +49,7 @@ export function StateTreeVisualizer({ game }: StateTreeVisualizerProps) {
 
   const handScore = calculateHandScore(game.currentPlayer);
 
-  const isInState = (statePath: any) => {
+  const isInState = (statePath: string | Record<string, unknown>) => {
     return game.snapshot.matches(statePath);
   };
 
