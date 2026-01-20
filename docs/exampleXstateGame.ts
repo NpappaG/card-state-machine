@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { setup, enqueueActions, assign } from "xstate";
 
 function range(num: number): number[] {

@@ -4,11 +4,12 @@ A state machine architecture for a turn-based card game system using XState v5.
 
 ## Overview
 
-This project implements a turn-based card matching game where 2-4 players race to empty their hands (or finish with the lowest score) before a 3-minute timer expires.
+This project implements a turn-based card matching game where 2-4 players compete to match cards by rank to a discard pile. The goal is to be the first to discard all cards or to finish with the lowest hand value when the round timer expires.
 
 ## Game Mechanics
 
-Achieve the lowest total hand value or dispose of all your cards before the 3-minute round timer expires.
+*   **Objective**: Be the first to discard all your cards, or have the lowest total hand value when the 3-minute round timer expires.
+*   **Card Play**: Match cards by rank to the top card of the shared discard pile. If you cannot play a match, you must take another card from the deck.
 
 ### Scoring System
 
@@ -26,187 +27,194 @@ Standard 52-card deck in play.
 - **Initial Deal**: Each player receives 5 cards
 - **Starting Card**: One additional card is revealed to seed the discard pile
 - **First Player**: Randomly selected
-- **Timer**: Optional 3-minute round timer limits play
+- **Timer**: A 3-minute round timer limits play
 
 ### Turn Loop
 
-1. **Auto-play** – If the active player has exactly one card that matches the rank of the top discard card, it is played automatically.
-2. **Selecting** – If multiple cards match the top discard rank, the player can select/deselect those cards and press SPACE/“Play Selected” to place exactly one matching card on the discard pile.
-3. **Drawing** – If no matching cards exist, the player draws one card from the deck. Play immediately advances to the next player.
+1. **Selecting** – If multiple cards match the top discard rank, the player can select/deselect those cards and press SPACE/“Play Selected” to place one or more matching cards on the discard pile.
+2. **Auto-play** – If the active player has exactly one card that matches the rank of the top discard card, it is played automatically.
+3. **Drawing** – If no matching cards exist, the player draws one card from the deck. The turn then advances to the next player; the player cannot play the newly drawn card in the same turn.
 
-This loop repeats in player order until a hand empties or the timer expires.
+This loop repeats in player order until a hand empties, the timer expires, or the deck runs out.
 
 ### Controls
 
 - Click a card to select/deselect it when the machine is in the `selecting` state.
-- Press SPACE (or the “Play Selected” button) to confirm the single-card selection.
+- Press SPACE (or the “Play Selected” button) to play the selected cards.
 - Auto-play runs without input whenever only one valid card exists.
 
 ### State Chart Outline
 
 ```
-idle
-  └─ 'game.start' (actions: initializeGame + startTimer) → roundActive
+cardGame
+├─ setup (on game.start → roundActive)
+├─ roundActive (timer actor; on timer.expired → roundEnd)
+│  ├─ playing (active gameplay; on round.pause → paused)
+│  │  └─ playerTurn (turn sequence loop)
+│  │     ├─ checkingCards (after CHECKING_DELAY* → guard routing)
+│  │     ├─ autoPlaying (after AUTO_PLAY_DELAY* → evaluating + autoPlaySingleCard)
+│  │     ├─ selecting (no delay; user selects/plays)
+│  │     ├─ drawing (after DRAW_DELAY* → evaluating)
+│  │     ├─ evaluating (after EVALUATING_DELAY* → roundEnd or changingTurn)
+│  │     └─ changingTurn (after TURN_CHANGE_DELAY* → checkingCards)
+│  └─ paused (on round.resume → history)
+└─ roundEnd (entry calculateScores; on round.start → roundActive; on game.over → setup)
 
-roundActive (invoke timer)
-  └─ playerTurn
-        checkingCards
-          ├─ no cards → roundEnd
-          ├─ multiple matches → selecting
-          ├─ single match → evaluating (auto-play)
-          └─ no matches → drawing
-        (Note: checkingCards has a topline delay that applies to all branches.
-         In the current architecture, this enables the auto-play amber highlight
-         animation but also delays manual selection and drawing paths. A potential
-         optimization would move the delay into the auto-play branch only.)
-        selecting
-          └─ 'card.play' (guard: canPlaySelectedCards) → evaluating
-        drawing (entry: drawCard)
-          └─ evaluating
-        evaluating
-          ├─ player empty → roundEnd
-          └─ changeTurn
-        changeTurn (entry: advanceTurn)
-          └─ checkingCards
-
-roundEnd (entry: calculateScores)
+* All delay constants configurable via timing.update event (see context.timing)
 ```
 
 ## Timing Architecture
 
-The state machine controls all timing via `GAME_TIMING` constants in `/lib/constants.ts`. These delays define finite time windows for each state, and UI animations are subordinate to these windows.
+All timing delays are configurable parameters (stored in `context.timing`) with defaults from `/lib/constants.ts`. Adjust them in the Speed Controls UI in-app: 
+
+![Speed controls UI](public/speed.png)
+
+TLDR - I went deep in the Xstate rabbit hole and decided to leave in my debugger. But it's pretty useful for getting the look and feel down for a game.
 
 **Design Principle:**
-
 - State machine delays define **state duration** (how long a state lasts)
 - Animations read these constants and **fill the available window**
 - As long as `animation duration ≤ state duration`, the system works correctly
+- Animations dynamically adjust their timing when state durations change (see `/lib/animations/cardAnimations.ts`)
 
-**Current timing window values (from `/lib/constants.ts`):**
+| State            | Purpose                                                  | Default Duration (ms) |
+| ---------------- | -------------------------------------------------------- | --------------------- |
+| checkingCards    | Checks for stalemate, then decides next action based on available cards | 200                   |
+| autoPlaying      | Shows auto-play animation for single matching card       | 1000                  |
+| drawing          | Shows card draw animation from deck to hand              | 1155                  |
+| evaluating       | Checks if current player won and clears card animations  | 400                   |
+| changingTurn     | Highlights next player                                   | 400                   |
 
-| Segment          | Constant                      | Duration (ms) | Purpose                                                  |
-| ---------------- | ----------------------------- | ------------- | -------------------------------------------------------- |
-| Check playable   | `GAME_TIMING.CHECKING_DELAY`  | 1000          | Buffer before any auto-play/select/draw action           |
-| Draw animation   | `GAME_TIMING.DRAW_DELAY`      | 1155          | Covers deck-to-hand travel + flip                       |
-| Evaluate result  | `GAME_TIMING.EVALUATING_DELAY`| 400           | Lets discard animations finish + checks win condition    |
-| Turn highlight   | `GAME_TIMING.TURN_CHANGE_DELAY`| 400          | Gives UI time to highlight the next player               |
-| Round timer      | `GAME_TIMING.ROUND_DURATION_MS`| 180000       | 3-minute round duration                                  |
-
-**Proportional Animation System:**
-
-Animations calculate their keyframe timing proportionally based on fixed phase durations:
-
-```typescript
-// Animation builder calculates timing from state duration
-function buildAutoPlayingAnimation() {
-  const totalDuration = GAME_TIMING.CHECKING_DELAY; // 2000ms
-  const liftDuration = 400;   // Fixed: lift phase
-  const settleDuration = 300; // Fixed: settle phase
-  // Hold phase = remainder (1300ms)
-
-  // Calculate proportional keyframe positions
-  const liftEnd = liftDuration / totalDuration;     // 0.2 (20%)
-  const settleEnd = (lift + settle) / totalDuration; // 0.35 (35%)
-
-  return {
-    scale: [1, 1.1, 1.08, 1.08],
-    transition: {
-      duration: totalDuration / 1000, // 2s
-      times: [0, liftEnd, settleEnd, 1], // Calculated, not hardcoded
-    },
-  };
-}
-```
-
-If `CHECKING_DELAY` changes to 3000ms, the animation automatically adjusts:
-- Lift: 400ms (13.3%)
-- Settle: 300ms (10%)
-- Hold: 2300ms (76.7%)
-
-This is **time-based coordination** (not event-driven). The state machine is the clock - it doesn't wait for animations to signal completion. This approach is appropriate for games with predictable, fixed-duration animations where consistent timing is more important than perfect animation synchronization.
-
-**Alternative Approaches:**
-
-- Event-driven (animations send `ANIMATION_COMPLETE` events) would be more complex but allow variable-duration animations
-- Invoked actors (XState owns animation lifecycle) would couple state machine to UI layer
-- Current approach: Simple, maintainable, deterministic - good fit for fixed-duration game animations
-
-**Known Trade-off: Topline Delay**
-
-The `checkingCards` state has a 1000ms delay that applies to ALL branches (auto-play, selection, drawing). This creates a "topline bottleneck":
-
-- **Auto-play path**: ✅ Needs the 1s buffer for the amber highlight animation
-- **Manual selection path**: ⚠️ Adds a short pause before the user can click
-- **Drawing path**: ⚠️ Adds a short pause before the draw animation begins
-
-**Why keep it:**
-
-- Simplifies state machine structure (single delay point vs. per-branch delays)
-- Round timer continues during the delay, adding time pressure
-- Auto-play animation still has a predictable window
-
-**Potential optimization:**
-Move most of the delay into an `autoPlaying` branch so selection/drawing can be instantaneous:
-
-```
-checkingCards (instant) → readyToAct
-  ├─ AUTO_PLAY → autoPlaying (1000ms) → evaluating
-  ├─ SELECTING_REQUIRED → selecting (instant)
-  └─ DRAW_REQUIRED → drawing (instant)
-```
-
-This would make the game more responsive while maintaining auto-play animation quality. Deferred for future iteration.
+This is **time-based coordination** (not event-driven). The state machine is the clock - it doesn't wait for animations to signal completion. See `docs/ARCHITECTURE.md` for detailed timing decisions.
 
 ## State Machine Schema
 
-### Config
-- Parallel: `false`
-
 ### Context
+<details>
+<summary>Show details</summary>
+
 - `players`: Array of `{ id, name, hand, score }`
 - `currentPlayerIndex`: Index of active player
 - `deck`: Remaining draw pile
 - `discardPile`: Cards that have been played
-- `selectedCards`: Currently highlighted cards (max 1)
-- `timerStartMs`, `timerRemainingMs`: Track 3-minute timer
+- `selectedCards`: Currently highlighted cards (one or more)
 - `roundScores`: Final scores recorded at round end
+- `timing`: Configurable state durations
+
+**Note:** Timer state (`remainingMs`, `startMs`) lives in the timer machine actor, not in game context.
+
+</details>
 
 ### States
-- `idle`: Await `game.start`
+<details>
+<summary>Show details</summary>
+
+- `setup`: Await `game.start`
 - `roundActive`
-  - `playerTurn`
-    - `checkingCards`: delay window before acting
-    - `readyToAct`: raises internal decision events
-    - `selecting`: player chooses a matching card
-    - `drawing`: forced draw animation
-    - `evaluating`: check win condition or continue
-    - `changingTurn`: advance to next player
-- `roundEnd`: Scores calculated, wait for restart
+  - `playing`
+    - `playerTurn`
+      - `checkingCards`: fast decision routing (default: 200ms)
+      - `autoPlaying`: dedicated auto-play animation state (default: 1000ms)
+      - `selecting`: player chooses matching cards (multi-card selection supported)
+      - `drawing`: forced draw animation (default: 1155ms)
+      - `evaluating`: check win condition or continue (default: 400ms)
+      - `changingTurn`: advance to next player (default: 400ms)
+    - `hist`: history state for pause/resume
+  - `paused`: game paused, timer frozen
+- `roundEnd`: Scores calculated, can restart round or end game
+
+</details>
 
 ### Events
-- External: `game.start`, `card.select`, `card.deselect`, `card.play`, `timer.tick`
-- Internal (raised): `ROUND_END`, `AUTO_PLAY`, `SELECTING_REQUIRED`, `DRAW_REQUIRED`
+<details>
+<summary>Show details</summary>
+
+**External Events:**
+- `game.start` - User starts a new game
+- `round.start` - User starts a new round (keeps players, resets deck)
+- `game.over` - User ends game, returns to setup
+- `card.select`, `card.deselect` - User selects/deselects cards
+- `card.play` - User plays selected cards (SPACE key)
+- `round.pause`, `round.resume` - User pauses/resumes game
+- `timer.expired` - Timer machine notifies when time's up
+- `timing.update` - Dynamic timing configuration updates
+
+**Note:** Decision logic (auto-play vs manual selection) is now handled by guards in `checkingCards`, not internal events.
+
+</details>
 
 ### Guards
-- `canPlaySelectedCards`: Exactly one selected card matches top discard
-- `currentPlayerHasNoCards`: Active hand is empty
-- `timerExpired`: Timer reached zero
+<details>
+<summary>Show details</summary>
 
-### Transitions (highlights)
-- `idle` --`game.start / initializeGame + startTimer`--> `roundActive`
-- `checkingCards` --after `CHECKING_DELAY`--> `readyToAct`
-- `readyToAct` --`AUTO_PLAY / autoPlaySingleCard`--> `evaluating`
-- `readyToAct` --`SELECTING_REQUIRED`--> `selecting`
-- `readyToAct` --`DRAW_REQUIRED`--> `drawing`
+- `canPlaySelectedCards`: All selected cards match top discard rank
+- `currentPlayerHasNoCards`: Active player's hand is empty (win condition)
+- `hasMultipleValidCards`: Player has 2+ cards matching top discard
+- `hasSingleValidCard`: Player has exactly 1 card matching top discard
+- `deckEmpty`: Used when the draw pile is empty. This may lead to a turn skip.
+- `isStalemate`: A more specific check for when the deck is empty AND no player can make a valid move. This ends the round.
+
+</details>
+
+### Key Transitions
+<details>
+<summary>Show details</summary>
+
+- `setup` --`game.start`--> `roundActive`
+- `checkingCards` --after `CHECKING_DELAY` + guards-->
+  - `isStalemate` → `roundEnd` (deck empty, no one can play)
+  - `hasMultipleValidCards` → `selecting`
+  - `hasSingleValidCard` → `autoPlaying`
+  - `deckEmpty` → `changingTurn` (skip turn, someone else might play)
+  - default → `drawing`
+- `autoPlaying` --after `AUTO_PLAY_DELAY` + `autoPlaySingleCard`--> `evaluating`
 - `drawing` --after `DRAW_DELAY`--> `evaluating`
 - `evaluating` --`currentPlayerHasNoCards`--> `roundEnd`
 - `evaluating` --else--> `changingTurn`
-- `changingTurn` --after `TURN_CHANGE_DELAY / advanceTurn`--> `checkingCards`
-- `roundActive` --`timerExpired`--> `roundEnd`
+- `roundEnd` --`round.start`--> `roundActive` (same players)
+- `roundEnd` --`game.over`--> `setup` (full reset)
+- `changingTurn` --after `TURN_CHANGE_DELAY` + `advanceTurn`--> `checkingCards`
+- `roundActive` --`timer.expired`--> `roundEnd`
+
+</details>
 
 ### Actions
-- `initializeGame`, `startTimer`, `decideNextAction`, `selectCard`, `deselectCard`, `playSelectedCards`
-- `autoPlaySingleCard`, `drawCard`, `advanceTurn`, `updateTimer`, `calculateScores`
+<details>
+<summary>Show details</summary>
+
+- `initializeGame`, `restartRound`, `resetGame`
+- `selectCard`, `deselectCard`, `playSelectedCards`, `autoPlaySingleCard`, `drawCard`, `advanceTurn`
+- `forwardPauseToTimer`, `forwardResumeToTimer`, `calculateScores`, `updateTimingConfig`
+
+</details>
+
+## Machines
+
+This app uses two XState machines:
+- `machines/cardGameMachine.ts` orchestrates gameplay and invokes the timer actor.
+- `machines/timerMachine.ts` owns round timing and emits `timer.expired`.
+
+Pure helpers live in `lib/cardGameLogic.ts` (game rules/reducers) and `lib/timerHelpers.ts` (timer actor accessors).
+
+## Architectural Decisions
+Xstate gives you a ton (and sometime frustrating amount) of flexibility on modeling state. So I'm noting a few key decisions/rewrites that I did over the journey:
+### 1. Time-Based Pacing over Event-Based Coordination
+
+**Problem:** Initial versions of the machine executed state transitions instantly, causing a "cascade" where multiple turns could happen in milliseconds without the UI updating.
+
+**Solution:** We chose a "pragmatic delays" approach, using XState's `after` delays to create observable states. The state machine acts as the "clock," and UI animations are subordinate to its timing. This provides consistent, predictable pacing without the complexity of a fully event-driven system where the UI would need to send `animation.complete` events back to the machine. This decision is detailed further in `docs/ARCHITECTURE.md`.
+
+### 2. Guard-Based Routing over Internal Events
+
+**Problem:** Decision-making (e.g., auto-play vs. manual selection vs. drawing) could be modeled in several ways. An early version used an intermediate `readyToAct` state that would `raise()` internal events.
+
+**Solution:** The machine was refactored to use a more direct and declarative pattern. The `checkingCards` state now uses a prioritized list of guarded transitions. The Stately UI builder thing doesn't love it, but it's far more readable.
+
+### 3. Dedicated Timer Actor
+
+**Problem:** Timer logic and game logic are separate concerns. While easily done in a monoloth, mixing them in the same machine ultimatley felt cluttered.
+
+**Solution:** Separated into `timerMachine` and `gameMachine` and while I was at it I added pause/play. The main game machine invokes this actor and only listens for a single `timer.expired` event. All timer-related state (remaining time, pause state) is owned exclusively by the timer actor.
 
 ## Tech Stack
 
@@ -234,12 +242,35 @@ bun run build
 
 - `docs/XSTATE_DOCS.md` - XState v5 reference for context
 - `machines/cardGameMachine.ts` - Main game state machine implementation
-- `docs/` for more agent notes
+- `machines/timerMachine.ts` - Round timer actor machine
+- `lib/cardGameLogic.ts` - Pure game rules and reducers
+- `lib/timerHelpers.ts` - Timer actor accessors
+- `docs/` for more agent notes & V5 examples I worked off
+
+## Terminology: "Round" vs "Game"
+
+**Domain Model (Code)**: Uses "round" terminology per requirements document
+- State names: `roundEnd`, `roundActive`
+- Events: `round.start`, `round.pause`, `round.resume`
+- Comments and docs reference "round timer", "round scores"
+- Test files use "round" language
+
+**User Interface**: Uses "game" terminology for clarity
+- "Game Over!" (not "Round Over!")
+- "Play Again (same setup)" - rematch with same players
+- "Back to Menu" - return to setup screen
+
+**Rationale**: while making this I tried wiring up versions that have multiple rounds and multi-round scoring, and that's the logical direction for making a more fun game. But I pared it all back to keep it simple per the ask.
 
 ## My notes on it
 
 Xstate is a convenient single source of truth - I definitely see the appeal for complex UI flows. It does seems intuitive that you have one ironclad skeleton for state and everything else subscribed to it.
 
-I wanted to keep the state machine as minimal as possible and keep all UI concerns separate - that seemed like a core thing from the suggested video I watched. (Interestingly, the guy said Stately's UI formatter was bad, but I found it helpful at first to double check logic directions - it does seem to break down with some v5 syntax).
+Keeping UI and state separate seemed like the main idea from the videos I watched. (Interestingly, the guy said Stately's UI formatter was bad, but I found it helpful at first to double check logic directions - tho it gets worse with v5 syntax). Going deeper I started to see where devs might add bi-directional plumbing (eg ui.animationComplete) that updates state machine.
 
-The more I learned, the more complexities arose actually. Mostly with regard to timing animations, I realized they were getting cutoff/running longer than the allotted delay windows. Then I just made the animation length a function of their possible window and realized it was a fine enough solution for a quick game. I see where devs might add more plumbing like a ui.animationComplete, and so on.
+I will say it seems like Stately's stuff is all 2 years+ old and code examples beyond their official docs are scant. But I think it's worth the difficulty and I might incorporate into my own projects.
+
+## Other / possible directions
+- it's not technically possible to discard all your cards with 5 dealt cards, so we'd need a rule change to add the the discards
+- multi round is way more fun/cool (I tried it out and then pared it back)
+- if we add more complexity it might make sense to make Players to be Actors

@@ -1,5 +1,6 @@
 import { test, expect, describe } from 'bun:test';
-import * as Logic from '../machines/cardGameLogic';
+import * as Logic from '../lib/cardGameLogic';
+import { GAME_TIMING } from '../lib/constants';
 import type { Card, GameContext, Player, Rank, Suit } from '../lib/types';
 
 // ============================================================================
@@ -42,9 +43,15 @@ function makeContext(overrides: Partial<GameContext> = {}): GameContext {
     deck: overrides.deck ?? [],
     discardPile: overrides.discardPile ?? [makeCard('K')],
     selectedCards: overrides.selectedCards ?? [],
-    timerStartMs: overrides.timerStartMs ?? 0,
-    timerRemainingMs: overrides.timerRemainingMs ?? 180000,
     roundScores: overrides.roundScores ?? {},
+    timing: overrides.timing ?? {
+      CHECKING_DELAY: GAME_TIMING.CHECKING_DELAY,
+      AUTO_PLAY_DELAY: GAME_TIMING.AUTO_PLAY_DELAY,
+      DRAW_DELAY: GAME_TIMING.DRAW_DELAY,
+      EVALUATING_DELAY: GAME_TIMING.EVALUATING_DELAY,
+      TURN_CHANGE_DELAY: GAME_TIMING.TURN_CHANGE_DELAY,
+      ROUND_DURATION_MS: GAME_TIMING.ROUND_DURATION_MS,
+    },
   };
 }
 
@@ -74,7 +81,7 @@ describe('canPlaySelectedCards', () => {
     expect(Logic.canPlaySelectedCards(context)).toBe(true);
   });
 
-  test('returns false when multiple cards are selected (only single card allowed)', () => {
+  test('returns true when all selected cards match top discard', () => {
     const topCard = makeCard('Q', 'hearts');
     const selected1 = makeCard('Q', 'spades');
     const selected2 = makeCard('Q', 'diamonds');
@@ -84,16 +91,17 @@ describe('canPlaySelectedCards', () => {
       selectedCards: [selected1, selected2],
     });
 
-    expect(Logic.canPlaySelectedCards(context)).toBe(false);
+    expect(Logic.canPlaySelectedCards(context)).toBe(true);
   });
 
-  test('returns false when selected card has different rank than top discard', () => {
+  test('returns false when any selected card has different rank than top discard', () => {
     const topCard = makeCard('A', 'hearts');
-    const selectedCard = makeCard('K', 'hearts');
+    const selectedCard = makeCard('A', 'clubs');
+    const mismatchedCard = makeCard('K', 'hearts');
 
     const context = makeContext({
       discardPile: [topCard],
-      selectedCards: [selectedCard],
+      selectedCards: [selectedCard, mismatchedCard],
     });
 
     expect(Logic.canPlaySelectedCards(context)).toBe(false);
@@ -329,52 +337,6 @@ describe('currentPlayerHasNoCards', () => {
 });
 
 // ============================================================================
-// Guard Tests: timerExpired
-// ============================================================================
-
-describe('timerExpired', () => {
-  test('returns true when timer is at 0', () => {
-    const context = makeContext({
-      timerRemainingMs: 0,
-    });
-
-    expect(Logic.timerExpired(context)).toBe(true);
-  });
-
-  test('returns true when timer is negative (edge case)', () => {
-    const context = makeContext({
-      timerRemainingMs: -100,
-    });
-
-    expect(Logic.timerExpired(context)).toBe(true);
-  });
-
-  test('returns false when timer has 1ms remaining', () => {
-    const context = makeContext({
-      timerRemainingMs: 1,
-    });
-
-    expect(Logic.timerExpired(context)).toBe(false);
-  });
-
-  test('returns false when timer is at full duration (180 seconds)', () => {
-    const context = makeContext({
-      timerRemainingMs: 180000,
-    });
-
-    expect(Logic.timerExpired(context)).toBe(false);
-  });
-
-  test('returns false when timer has 10 seconds remaining', () => {
-    const context = makeContext({
-      timerRemainingMs: 10000,
-    });
-
-    expect(Logic.timerExpired(context)).toBe(false);
-  });
-});
-
-// ============================================================================
 // Guard Tests: deckEmpty
 // ============================================================================
 
@@ -420,6 +382,100 @@ describe('deckEmpty', () => {
 
     expect(Logic.deckEmpty(context)).toBe(false);
     expect(context.deck.length).toBe(52);
+  });
+});
+
+describe('noPlayersHaveMatches', () => {
+  test('returns true when no player has matching cards', () => {
+    const topCard = makeCard('K', 'hearts');
+    const player1 = makePlayer([makeCard('2'), makeCard('3')]);
+    const player2 = makePlayer([makeCard('4'), makeCard('5')]);
+
+    const context = makeContext({
+      players: [player1, player2],
+      discardPile: [topCard],
+    });
+
+    expect(Logic.noPlayersHaveMatches(context)).toBe(true);
+  });
+
+  test('returns false when at least one player has a match', () => {
+    const topCard = makeCard('K', 'hearts');
+    const player1 = makePlayer([makeCard('2'), makeCard('3')]);
+    const player2 = makePlayer([makeCard('K', 'spades'), makeCard('5')]);
+
+    const context = makeContext({
+      players: [player1, player2],
+      discardPile: [topCard],
+    });
+
+    expect(Logic.noPlayersHaveMatches(context)).toBe(false);
+  });
+
+  test('returns false when multiple players have matches', () => {
+    const topCard = makeCard('7', 'hearts');
+    const player1 = makePlayer([makeCard('7', 'spades'), makeCard('3')]);
+    const player2 = makePlayer([makeCard('7', 'diamonds'), makeCard('5')]);
+
+    const context = makeContext({
+      players: [player1, player2],
+      discardPile: [topCard],
+    });
+
+    expect(Logic.noPlayersHaveMatches(context)).toBe(false);
+  });
+
+  test('returns false when discard pile is empty', () => {
+    const player1 = makePlayer([makeCard('2'), makeCard('3')]);
+
+    const context = makeContext({
+      players: [player1],
+      discardPile: [],
+    });
+
+    expect(Logic.noPlayersHaveMatches(context)).toBe(false);
+  });
+});
+
+describe('isStalemate', () => {
+  test('returns true when deck empty and no players have matches', () => {
+    const topCard = makeCard('K', 'hearts');
+    const player1 = makePlayer([makeCard('2'), makeCard('3')]);
+    const player2 = makePlayer([makeCard('4'), makeCard('5')]);
+
+    const context = makeContext({
+      players: [player1, player2],
+      discardPile: [topCard],
+      deck: [],
+    });
+
+    expect(Logic.isStalemate(context)).toBe(true);
+  });
+
+  test('returns false when deck has cards', () => {
+    const topCard = makeCard('K', 'hearts');
+    const player1 = makePlayer([makeCard('2'), makeCard('3')]);
+
+    const context = makeContext({
+      players: [player1],
+      discardPile: [topCard],
+      deck: [makeCard('A')],
+    });
+
+    expect(Logic.isStalemate(context)).toBe(false);
+  });
+
+  test('returns false when someone has a match', () => {
+    const topCard = makeCard('K', 'hearts');
+    const player1 = makePlayer([makeCard('K', 'spades'), makeCard('3')]);
+
+    const context = makeContext({
+      players: [player1],
+      discardPile: [topCard],
+      deck: [],
+    });
+
+    expect(Logic.isStalemate(context)).toBe(false);
   });
 });
 
@@ -477,38 +533,9 @@ describe('initializeGameReducer', () => {
     expect(context.currentPlayerIndex).toBeLessThan(3);
   });
 
-  test('initializes timer to 3 minutes (180000ms)', () => {
-    const context = Logic.initializeGameReducer(2);
-    expect(context.timerRemainingMs).toBe(180000);
-  });
-
   test('initializes empty selected cards array', () => {
     const context = Logic.initializeGameReducer(2);
     expect(context.selectedCards).toEqual([]);
-  });
-});
-
-describe('startTimerReducer', () => {
-  test('updates timerStartMs without mutating context', () => {
-    const originalContext = makeContext();
-    const updatedContext = Logic.startTimerReducer(originalContext);
-
-    expect(updatedContext).not.toBe(originalContext);
-    expect(updatedContext.timerStartMs).toBeGreaterThan(0);
-  });
-
-  test('preserves all other context properties', () => {
-    const player1 = makePlayer([makeCard('K')], 'player-1');
-    const originalContext = makeContext({
-      players: [player1],
-      currentPlayerIndex: 0,
-      deck: [makeCard('Q')],
-    });
-
-    const updatedContext = Logic.startTimerReducer(originalContext);
-
-    expect(updatedContext.players).toBe(originalContext.players);
-    expect(updatedContext.deck).toBe(originalContext.deck);
   });
 });
 
@@ -519,6 +546,7 @@ describe('selectCardReducer', () => {
     const originalContext = makeContext({
       players: [player],
       selectedCards: [],
+      discardPile: [makeCard('J', 'spades')],
     });
 
     const updatedContext = Logic.selectCardReducer(originalContext, card.id);
@@ -547,6 +575,20 @@ describe('selectCardReducer', () => {
     const originalContext = makeContext({
       players: [player],
       selectedCards: [card],
+      discardPile: [makeCard('Q', 'clubs')],
+    });
+
+    const updatedContext = Logic.selectCardReducer(originalContext, card.id);
+
+    expect(updatedContext).toBe(originalContext);
+  });
+
+  test('returns same context when card does not match top discard', () => {
+    const card = makeCard('9', 'hearts');
+    const player = makePlayer([card]);
+    const originalContext = makeContext({
+      players: [player],
+      discardPile: [makeCard('K', 'spades')],
     });
 
     const updatedContext = Logic.selectCardReducer(originalContext, card.id);
@@ -558,7 +600,10 @@ describe('selectCardReducer', () => {
     const card1 = makeCard('7', 'hearts');
     const card2 = makeCard('7', 'spades');
     const player = makePlayer([card1, card2]);
-    let context = makeContext({ players: [player] });
+    let context = makeContext({
+      players: [player],
+      discardPile: [makeCard('7', 'clubs')],
+    });
 
     context = Logic.selectCardReducer(context, card1.id);
     context = Logic.selectCardReducer(context, card2.id);
@@ -840,34 +885,6 @@ describe('advanceTurnReducer', () => {
 
     expect(updatedContext.selectedCards).toEqual([]);
     expect(updatedContext.selectedCards).not.toBe(context.selectedCards);
-  });
-});
-
-describe('updateTimerReducer', () => {
-  test('decreases timerRemainingMs without mutation', () => {
-    const startTime = performance.now();
-    const originalContext = makeContext({
-      timerStartMs: startTime - 5000, // 5 seconds elapsed
-      timerRemainingMs: 180000,
-    });
-
-    const updatedContext = Logic.updateTimerReducer(originalContext);
-
-    expect(updatedContext).not.toBe(originalContext);
-    expect(updatedContext.timerRemainingMs).toBeLessThan(180000);
-    expect(updatedContext.timerRemainingMs).toBeGreaterThanOrEqual(0);
-  });
-
-  test('never goes below 0', () => {
-    const startTime = performance.now();
-    const context = makeContext({
-      timerStartMs: startTime - 200000, // More than 180 seconds elapsed
-      timerRemainingMs: 180000,
-    });
-
-    const updatedContext = Logic.updateTimerReducer(context);
-
-    expect(updatedContext.timerRemainingMs).toBe(0);
   });
 });
 

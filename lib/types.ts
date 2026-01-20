@@ -9,6 +9,15 @@ export type Card = {
   id: string; // unique identifier (e.g., "hearts-A")
 };
 
+export type CardAnimationState =
+  | 'idle'
+  | 'selected'
+  | 'exiting'
+  | 'inHand'
+  | 'entering'
+  | 'autoPlaying'
+  | 'shake';
+
 // Player type
 export type Player = {
   id: string;
@@ -28,16 +37,13 @@ export type GameContext = {
   discardPile: Card[];
   selectedCards: Card[];
 
-  // Timer
-  timerStartMs: number;
-  timerRemainingMs: number; // 180000ms (3 minutes)
-
   // Scoring
   roundScores: Record<string, number>;
 
   // Timing configuration (dynamic)
   timing: {
     CHECKING_DELAY: number;
+    AUTO_PLAY_DELAY: number;
     DRAW_DELAY: number;
     EVALUATING_DELAY: number;
     TURN_CHANGE_DELAY: number;
@@ -48,10 +54,13 @@ export type GameContext = {
 // Game events (using dot notation for XState v5 convention)
 export type GameEvent =
   // External events (from UI/user)
-  | { type: 'game.start'; playerCount: number; playerNames?: string[] }
+  | { type: 'game.start'; playerCount: number; playerNames?: string[]; timestamp: number }
   | { type: 'card.select'; cardId: string }
   | { type: 'card.deselect'; cardId: string }
   | { type: 'card.play' }
-  | { type: 'timer.tick' }
-  | { type: 'game.newRound' }
-  | { type: 'game.over' };
+  | { type: 'timer.expired' }
+  | { type: 'round.pause'; timestamp: number }
+  | { type: 'round.resume'; timestamp: number }
+  | { type: 'round.start'; timestamp: number }
+  | { type: 'game.over' }
+  | { type: 'timing.update'; timing: GameContext['timing'] };

@@ -39,12 +39,29 @@ export function SpeedControls() {
           </label>
           <input
             type="range"
-            min="500"
-            max="5000"
-            step="100"
+            min="0"
+            max="1000"
+            step="50"
             value={timing.CHECKING_DELAY}
             onChange={(e) => timing.updateTiming('CHECKING_DELAY', Number(e.target.value))}
             className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500"
+          />
+        </div>
+
+        {/* Auto-Play Delay */}
+        <div>
+          <label className="text-[10px] text-gray-400 font-mono flex justify-between">
+            <span>Auto-Play Delay</span>
+            <span className="text-amber-400">{timing.AUTO_PLAY_DELAY}ms</span>
+          </label>
+          <input
+            type="range"
+            min="0"
+            max="5000"
+            step="100"
+            value={timing.AUTO_PLAY_DELAY}
+            onChange={(e) => timing.updateTiming('AUTO_PLAY_DELAY', Number(e.target.value))}
+            className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
           />
         </div>
 
@@ -56,7 +73,7 @@ export function SpeedControls() {
           </label>
           <input
             type="range"
-            min="500"
+            min="0"
             max="3000"
             step="50"
             value={timing.DRAW_DELAY}
@@ -73,7 +90,7 @@ export function SpeedControls() {
           </label>
           <input
             type="range"
-            min="200"
+            min="0"
             max="2000"
             step="50"
             value={timing.EVALUATING_DELAY}
@@ -90,7 +107,7 @@ export function SpeedControls() {
           </label>
           <input
             type="range"
-            min="100"
+            min="0"
             max="1000"
             step="50"
             value={timing.TURN_CHANGE_DELAY}

@@ -6,7 +6,6 @@ import { StateNode } from './StateNode';
 import { calculateHandScore } from '@/lib/utils/scoreCalculator';
 
 interface StateTreeVisualizerProps {
-  currentState: any;
   game: UseCardGameReturn;
 }
 
@@ -14,23 +13,35 @@ interface StateTreeVisualizerProps {
  * Visualizes the XState machine state tree with live highlighting
  * Fixed to the right side with collapse functionality
  */
-export function StateTreeVisualizer({ currentState, game }: StateTreeVisualizerProps) {
-  // Always start collapsed to match SSR
+export function StateTreeVisualizer({ game }: StateTreeVisualizerProps) {
+  // Always start collapsed to match SSR (prevents hydration mismatch)
   const [isCollapsed, setIsCollapsed] = useState(true);
 
-  // Restore from localStorage after hydration
+  // Read from localStorage after hydration
   useEffect(() => {
-    const stored = localStorage.getItem('xstate-visualizer-collapsed');
-    if (stored !== null) {
-      setIsCollapsed(stored === 'true');
+    try {
+      const stored = localStorage.getItem('xstate-visualizer-collapsed');
+      if (stored !== null) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- Legitimate pattern to sync with localStorage after SSR hydration
+        setIsCollapsed(stored === 'true');
+      }
+    } catch (error) {
+      // localStorage may be disabled (private browsing) or throw errors
+      console.warn('Failed to read from localStorage:', error);
     }
-  }, []);
+  }, []); // Run once on mount
 
   // Persist collapse state to localStorage
   useEffect(() => {
-    localStorage.setItem('xstate-visualizer-collapsed', String(isCollapsed));
+    try {
+      localStorage.setItem('xstate-visualizer-collapsed', String(isCollapsed));
+    } catch (error) {
+      // localStorage may be disabled or quota exceeded
+      console.warn('Failed to write to localStorage:', error);
+    }
   }, [isCollapsed]);
-  const stateValue = typeof currentState === 'object' ? JSON.stringify(currentState) : String(currentState);
+  const rawStateValue = game.snapshot.value;
+  const stateValue = typeof rawStateValue === 'object' ? JSON.stringify(rawStateValue) : String(rawStateValue);
 
   const matchingCards = game.currentPlayer?.hand.filter(
     c => c.rank === game.topDiscard?.rank
@@ -38,8 +49,8 @@ export function StateTreeVisualizer({ currentState, game }: StateTreeVisualizerP
 
   const handScore = calculateHandScore(game.currentPlayer);
 
-  const isInState = (state: string) => {
-    return stateValue.includes(state);
+  const isInState = (statePath: any) => {
+    return game.snapshot.matches(statePath);
   };
 
   return (
@@ -79,16 +90,44 @@ export function StateTreeVisualizer({ currentState, game }: StateTreeVisualizerP
           </div>
 
           <div className="flex flex-col gap-0.5">
-            <StateNode name="idle" isActive={isInState('idle')} />
             <StateNode name="setup" isActive={isInState('setup')} />
 
             <StateNode name="roundActive" isActive={isInState('roundActive')} />
-            <StateNode name="  playerTurn" isActive={isInState('playerTurn')} level={1} />
-            <StateNode name="    checkingCards" isActive={isInState('checkingCards')} level={2} />
-            <StateNode name="    selecting" isActive={isInState('selecting')} level={2} />
-            <StateNode name="    drawing" isActive={isInState('drawing')} level={2} />
-            <StateNode name="    evaluating" isActive={isInState('evaluating')} level={2} />
-            <StateNode name="    changingTurn" isActive={isInState('changingTurn')} level={2} />
+            <StateNode
+              name="  playerTurn"
+              isActive={isInState('roundActive.playing.playerTurn')}
+              level={1}
+            />
+            <StateNode
+              name="    checkingCards"
+              isActive={isInState('roundActive.playing.playerTurn.checkingCards')}
+              level={2}
+            />
+            <StateNode
+              name="    selecting"
+              isActive={isInState('roundActive.playing.playerTurn.selecting')}
+              level={2}
+            />
+            <StateNode
+              name="    autoPlaying"
+              isActive={isInState('roundActive.playing.playerTurn.autoPlaying')}
+              level={2}
+            />
+            <StateNode
+              name="    drawing"
+              isActive={isInState('roundActive.playing.playerTurn.drawing')}
+              level={2}
+            />
+            <StateNode
+              name="    evaluating"
+              isActive={isInState('roundActive.playing.playerTurn.evaluating')}
+              level={2}
+            />
+            <StateNode
+              name="    changingTurn"
+              isActive={isInState('roundActive.playing.playerTurn.changingTurn')}
+              level={2}
+            />
 
             <StateNode name="roundEnd" isActive={isInState('roundEnd')} />
           </div>

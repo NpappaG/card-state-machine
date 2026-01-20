@@ -260,6 +260,12 @@ Prefer explicit refs over `sendParent`.
 
 ---
 
+## Project Notes (Card Game)
+
+- `canPlaySelectedCards` allows one or more selected cards as long as all match the top discard rank.
+
+---
+
 ## 18. Tags & Meta
 
 ```ts

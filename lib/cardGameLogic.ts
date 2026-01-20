@@ -7,14 +7,13 @@ import { GAME_TIMING } from '@/lib/constants';
 
 /**
  * Check if selected cards can be played on the current discard pile.
- * Must have exactly one card selected that matches the top discard card rank.
+ * Must have at least one card selected and all must match the top discard rank.
  */
 export function canPlaySelectedCards(context: GameContext): boolean {
-  // Must have exactly one card selected
-  if (context.selectedCards.length !== 1) return false;
-
   const topCard = context.discardPile[context.discardPile.length - 1];
-  return context.selectedCards[0].rank === topCard.rank;
+  if (!topCard || context.selectedCards.length === 0) return false;
+
+  return context.selectedCards.every((card) => card.rank === topCard.rank);
 }
 
 /**
@@ -24,6 +23,8 @@ export function canPlaySelectedCards(context: GameContext): boolean {
 export function hasMultipleValidCards(context: GameContext): boolean {
   const currentPlayer = context.players[context.currentPlayerIndex];
   const topCard = context.discardPile[context.discardPile.length - 1];
+
+  if (!currentPlayer || !topCard) return false;
 
   const validCards = currentPlayer.hand.filter((card) => card.rank === topCard.rank);
   return validCards.length > 1;
@@ -37,6 +38,8 @@ export function hasSingleValidCard(context: GameContext): boolean {
   const currentPlayer = context.players[context.currentPlayerIndex];
   const topCard = context.discardPile[context.discardPile.length - 1];
 
+  if (!currentPlayer || !topCard) return false;
+
   const validCards = currentPlayer.hand.filter((card) => card.rank === topCard.rank);
   return validCards.length === 1;
 }
@@ -47,15 +50,18 @@ export function hasSingleValidCard(context: GameContext): boolean {
  */
 export function currentPlayerHasNoCards(context: GameContext): boolean {
   const currentPlayer = context.players[context.currentPlayerIndex];
+  if (!currentPlayer) return false;
   return currentPlayer.hand.length === 0;
 }
 
 /**
  * Check if the round timer has expired.
- * Win condition: when timer reaches 0, round ends.
+ * Note: Timer state is now owned by the timer machine.
+ * This function is deprecated - use timer actor snapshot instead.
  */
-export function timerExpired(context: GameContext): boolean {
-  return context.timerRemainingMs <= 0;
+export function timerExpired(): boolean {
+  // Timer state now lives in timer machine - read from actor snapshot
+  return false;
 }
 
 /**
@@ -66,52 +72,25 @@ export function deckEmpty(context: GameContext): boolean {
   return context.deck.length === 0;
 }
 
-export type NextAction =
-  | 'ROUND_END'
-  | 'AUTO_PLAY'
-  | 'SELECTING_REQUIRED'
-  | 'DRAW_REQUIRED';
+/**
+ * Check if no players have any cards matching the top discard.
+ * Used for stalemate detection when deck is empty.
+ */
+export function noPlayersHaveMatches(context: GameContext): boolean {
+  const topCard = context.discardPile[context.discardPile.length - 1];
+  if (!topCard) return false;
+
+  return context.players.every(player =>
+    player.hand.every(card => card.rank !== topCard.rank)
+  );
+}
 
 /**
- * Determines the next action for the current player based on game state.
- *
- * Decision Order:
- * 1. ROUND_END - Current player has no cards (win condition)
- * 2. AUTO_PLAY - Exactly one matching card (auto-play it)
- * 3. SELECTING_REQUIRED - Multiple matching cards (manual selection)
- * 4. ROUND_END - Deck is empty and no matching cards (can't continue)
- * 5. DRAW_REQUIRED - No matching cards but deck has cards (must draw)
- *
- * Deck Empty Rule:
- * When the deck runs out, the round ends. This prevents infinite loops where
- * all players skip turns because no one has matching cards. The round ends when:
- * - A player runs out of cards (wins), OR
- * - The deck is exhausted (no more cards to draw), OR
- * - The 3-minute timer expires
+ * Check if the game is in stalemate: deck empty and no player can play.
+ * This prevents infinite loops where turns cycle but no one can make progress.
  */
-export function determineNextAction(context: GameContext): NextAction {
-  // Check win condition first
-  if (currentPlayerHasNoCards(context)) {
-    return 'ROUND_END';
-  }
-
-  // Check for auto-play (single matching card)
-  if (hasSingleValidCard(context)) {
-    return 'AUTO_PLAY';
-  }
-
-  // Check for selection (multiple matching cards)
-  if (hasMultipleValidCards(context)) {
-    return 'SELECTING_REQUIRED';
-  }
-
-  // Check if deck is empty (can't draw, round ends)
-  if (deckEmpty(context)) {
-    return 'ROUND_END';
-  }
-
-  // Default: need to draw
-  return 'DRAW_REQUIRED';
+export function isStalemate(context: GameContext): boolean {
+  return deckEmpty(context) && noPlayersHaveMatches(context);
 }
 
 // ============================================================================
@@ -187,6 +166,7 @@ export function initializeGameReducer(
   playerNames?: string[],
   timing: GameContext['timing'] = {
     CHECKING_DELAY: GAME_TIMING.CHECKING_DELAY,
+    AUTO_PLAY_DELAY: GAME_TIMING.AUTO_PLAY_DELAY,
     DRAW_DELAY: GAME_TIMING.DRAW_DELAY,
     EVALUATING_DELAY: GAME_TIMING.EVALUATING_DELAY,
     TURN_CHANGE_DELAY: GAME_TIMING.TURN_CHANGE_DELAY,
@@ -227,20 +207,23 @@ export function initializeGameReducer(
     deck,
     discardPile,
     selectedCards: [],
-    timerStartMs: performance.now(),
-    timerRemainingMs: timing.ROUND_DURATION_MS,
     roundScores: Object.fromEntries(players.map((p) => [p.id, 0])),
     timing,
   };
 }
 
 /**
- * Start/reset the timer.
+ * Reset game state back to setup defaults while preserving timing config.
  */
-export function startTimerReducer(context: GameContext): GameContext {
+export function resetGameReducer(context: GameContext): GameContext {
   return {
-    ...context,
-    timerStartMs: performance.now(),
+    players: [],
+    currentPlayerIndex: 0,
+    deck: [],
+    discardPile: [],
+    selectedCards: [],
+    roundScores: {},
+    timing: context.timing,
   };
 }
 
@@ -250,9 +233,15 @@ export function startTimerReducer(context: GameContext): GameContext {
 export function selectCardReducer(context: GameContext, cardId: string): GameContext {
   const currentPlayer = context.players[context.currentPlayerIndex];
   const card = currentPlayer.hand.find((c) => c.id === cardId);
+  const topCard = context.discardPile[context.discardPile.length - 1];
 
   // Card not found or already selected
   if (!card || context.selectedCards.some((c) => c.id === card.id)) {
+    return context;
+  }
+
+  // Can only select cards that match the top discard rank
+  if (!topCard || card.rank !== topCard.rank) {
     return context;
   }
 
@@ -303,6 +292,8 @@ export function autoPlaySingleCardReducer(context: GameContext): GameContext {
   const currentPlayer = context.players[context.currentPlayerIndex];
   const topCard = context.discardPile[context.discardPile.length - 1];
 
+  if (!currentPlayer || !topCard) return context;
+
   // Find the single valid card
   const validCard = currentPlayer.hand.find((card) => card.rank === topCard.rank);
 
@@ -352,19 +343,6 @@ export function advanceTurnReducer(context: GameContext): GameContext {
     ...context,
     currentPlayerIndex: (context.currentPlayerIndex + 1) % context.players.length,
     selectedCards: [],
-  };
-}
-
-/**
- * Update the timer based on elapsed time.
- */
-export function updateTimerReducer(context: GameContext): GameContext {
-  const elapsed = performance.now() - context.timerStartMs;
-  const remaining = Math.max(0, context.timing.ROUND_DURATION_MS - elapsed);
-
-  return {
-    ...context,
-    timerRemainingMs: remaining,
   };
 }
 

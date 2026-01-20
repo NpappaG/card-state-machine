@@ -1,9 +1,10 @@
 'use client';
 
-import { useMachine } from '@xstate/react';
+import { useMachine, useSelector } from '@xstate/react';
 import { useEffect } from 'react';
 import { cardGameMachine } from '@/machines/cardGameMachine';
 import { useTiming } from '@/lib/contexts/TimingContext';
+import { getTimerRemainingMs } from '@/lib/timerHelpers';
 
 /**
  * Primary React hook for accessing card game state machine.
@@ -26,14 +27,17 @@ export function useCardGame() {
       type: 'timing.update',
       timing: {
         CHECKING_DELAY: timing.CHECKING_DELAY,
+        AUTO_PLAY_DELAY: timing.AUTO_PLAY_DELAY,
         DRAW_DELAY: timing.DRAW_DELAY,
         EVALUATING_DELAY: timing.EVALUATING_DELAY,
         TURN_CHANGE_DELAY: timing.TURN_CHANGE_DELAY,
         ROUND_DURATION_MS: timing.ROUND_DURATION_MS,
       },
     });
+    // Note: `send` is stable in XState but included for linter satisfaction
   }, [
     timing.CHECKING_DELAY,
+    timing.AUTO_PLAY_DELAY,
     timing.DRAW_DELAY,
     timing.EVALUATING_DELAY,
     timing.TURN_CHANGE_DELAY,
@@ -44,7 +48,17 @@ export function useCardGame() {
   // Derived state
   const currentPlayer = snapshot.context.players[snapshot.context.currentPlayerIndex];
   const topDiscard = snapshot.context.discardPile[snapshot.context.discardPile.length - 1];
-  const timerPercent = (snapshot.context.timerRemainingMs / 180000) * 100;
+  const roundDurationMs = snapshot.context.timing.ROUND_DURATION_MS;
+
+  // Timer state comes from timer actor, not context
+  // Use useSelector to subscribe to timer updates so React re-renders when timer ticks
+  const timerRemainingMs = useSelector(actor, (state) => {
+    const timerActor = state.children.timer;
+    return getTimerRemainingMs(timerActor);
+  });
+  const timerPercent = (timerRemainingMs / roundDurationMs) * 100;
+
+  const isSetupState = snapshot.matches('setup');
 
   return {
     // Core machine interface
@@ -61,29 +75,34 @@ export function useCardGame() {
     topDiscard,
     selectedCards: snapshot.context.selectedCards,
 
-    // Timer
-    timerRemainingMs: snapshot.context.timerRemainingMs,
+    // Timer (read from timer actor)
+    timerRemainingMs,
     timerPercent,
 
     // Scores
     roundScores: snapshot.context.roundScores,
 
     // State matchers (for conditional rendering)
-    isIdle: snapshot.matches('idle'),
-    isSetup: snapshot.matches('setup'),
+    isIdle: isSetupState,
+    isSetup: isSetupState,
     isRoundActive: snapshot.matches('roundActive'),
-    isCheckingCards: snapshot.matches({ roundActive: { playerTurn: 'checkingCards' } }),
-    isSelecting: snapshot.matches({ roundActive: { playerTurn: 'selecting' } }),
-    isDrawing: snapshot.matches({ roundActive: { playerTurn: 'drawing' } }),
-    isEvaluating: snapshot.matches({ roundActive: { playerTurn: 'evaluating' } }),
-    isChangingTurn: snapshot.matches({ roundActive: { playerTurn: 'changingTurn' } }),
+    isPaused: snapshot.matches({ roundActive: 'paused' }),
+    isPlaying: snapshot.matches({ roundActive: 'playing' }),
+    isCheckingCards: snapshot.matches({ roundActive: { playing: { playerTurn: 'checkingCards' } } }),
+    isAutoPlaying: snapshot.matches({ roundActive: { playing: { playerTurn: 'autoPlaying' } } }),
+    isSelecting: snapshot.matches({ roundActive: { playing: { playerTurn: 'selecting' } } }),
+    isDrawing: snapshot.matches({ roundActive: { playing: { playerTurn: 'drawing' } } }),
+    isEvaluating: snapshot.matches({ roundActive: { playing: { playerTurn: 'evaluating' } } }),
+    isChangingTurn: snapshot.matches({ roundActive: { playing: { playerTurn: 'changingTurn' } } }),
     isRoundEnd: snapshot.matches('roundEnd'),
 
     // Convenience methods
     canSelectCard: (cardId: string) => {
-      if (!currentPlayer) return false;
-      return currentPlayer.hand.some((c) => c.id === cardId) &&
-             !snapshot.context.selectedCards.some((c) => c.id === cardId);
+      if (!currentPlayer || !topDiscard) return false;
+      const card = currentPlayer.hand.find((c) => c.id === cardId);
+      if (!card) return false;
+      if (card.rank !== topDiscard.rank) return false;
+      return !snapshot.context.selectedCards.some((c) => c.id === cardId);
     },
 
     isCardSelected: (cardId: string) => {

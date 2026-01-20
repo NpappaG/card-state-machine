@@ -1,21 +1,26 @@
 import { GAME_TIMING } from '@/lib/constants';
 
 /**
- * Build autoPlaying animation with timing calculated from CHECKING_DELAY
+ * Animation phase percentages for auto-play timing.
+ * These define how the animation is divided into phases:
+ * - Lift: Card rises with scale increase (20% of duration)
+ * - Settle: Card settles into ready position (15% of duration)
+ * - Hold: Card holds position waiting to be played (65% of duration - implicit)
+ */
+const ANIMATION_LIFT_PHASE_PERCENT = 0.20;
+const ANIMATION_SETTLE_PHASE_PERCENT = 0.15;
+
+/**
+ * Build autoPlaying animation with timing calculated from AUTO_PLAY_DELAY
  * Phases: Lift (20%) → Settle (15%) → Hold (65%)
  * All phases scale proportionally with the total duration
  */
-function buildAutoPlayingAnimation(checkingDelay: number = GAME_TIMING.CHECKING_DELAY) {
-  const totalDuration = checkingDelay; // in ms
-
-  // Proportional phase percentages (instead of fixed milliseconds)
-  const liftPercent = 0.20;    // 20% for lift
-  const settlePercent = 0.15;  // 15% for settle
-  // holdPercent = 0.65 (65% for hold - implicit)
+function buildAutoPlayingAnimation(autoPlayDelay: number = GAME_TIMING.AUTO_PLAY_DELAY) {
+  const totalDuration = autoPlayDelay; // in ms
 
   // Calculate keyframe positions
-  const liftEnd = liftPercent;
-  const settleEnd = liftPercent + settlePercent;
+  const liftEnd = ANIMATION_LIFT_PHASE_PERCENT;
+  const settleEnd = ANIMATION_LIFT_PHASE_PERCENT + ANIMATION_SETTLE_PHASE_PERCENT;
 
   return {
     scale: [1, 1.1, 1.08, 1.08],
@@ -26,7 +31,7 @@ function buildAutoPlayingAnimation(checkingDelay: number = GAME_TIMING.CHECKING_
     transition: {
       duration: totalDuration / 1000, // Convert to seconds
       times: [0, liftEnd, settleEnd, 1], // Proportional keyframes
-      ease: [0.4, 0, 0.2, 1],
+      ease: [0.4, 0, 0.2, 1] as const,
     },
   };
 }
@@ -37,10 +42,14 @@ function buildAutoPlayingAnimation(checkingDelay: number = GAME_TIMING.CHECKING_
  */
 export function buildCardAnimationVariants(timing?: {
   CHECKING_DELAY?: number;
+  AUTO_PLAY_DELAY?: number;
   DRAW_DELAY?: number;
   EVALUATING_DELAY?: number;
 }) {
-  const checkingDelay = timing?.CHECKING_DELAY ?? GAME_TIMING.CHECKING_DELAY;
+  const autoPlayDelay =
+    timing?.AUTO_PLAY_DELAY ??
+    timing?.CHECKING_DELAY ??
+    GAME_TIMING.AUTO_PLAY_DELAY;
   const drawDelay = timing?.DRAW_DELAY ?? GAME_TIMING.DRAW_DELAY;
   const evaluatingDelay = timing?.EVALUATING_DELAY ?? GAME_TIMING.EVALUATING_DELAY;
 
@@ -59,7 +68,7 @@ export function buildCardAnimationVariants(timing?: {
       rotate: 0,
       opacity: 1,
     },
-    autoPlaying: buildAutoPlayingAnimation(checkingDelay),
+    autoPlaying: buildAutoPlayingAnimation(autoPlayDelay),
     entering: {
       scale: [0.7, 1.05, 0.98, 1],
       y: [-200, 0, -5, 0],
@@ -70,7 +79,7 @@ export function buildCardAnimationVariants(timing?: {
       transition: {
         duration: drawDelay / 1000,
         times: [0, 0.5, 0.75, 1], // Travel 50%, wriggle 50%-75%, settle 75%-100%
-        ease: [0.34, 1.56, 0.64, 1], // Elastic ease with slight overshoot
+        ease: [0.34, 1.56, 0.64, 1] as const, // Elastic ease with slight overshoot
       },
     },
     exiting: {
@@ -82,7 +91,7 @@ export function buildCardAnimationVariants(timing?: {
       transition: {
         duration: evaluatingDelay / 1000,
         times: [0, 0.4, 1],
-        ease: [0.4, 0, 0.6, 1],
+        ease: [0.4, 0, 0.6, 1] as const,
       },
     },
     inHand: {
@@ -91,6 +100,14 @@ export function buildCardAnimationVariants(timing?: {
       x: 0,
       rotate: 0,
       opacity: 1,
+    },
+    shake: {
+      x: [0, -10, 10, -10, 10, -5, 5, 0],
+      rotate: [0, -2, 2, -2, 2, -1, 1, 0],
+      transition: {
+        duration: 0.5,
+        ease: 'easeInOut' as const,
+      },
     },
   };
 }
@@ -136,15 +153,12 @@ export const CARD_FLIP_TIMING = buildCardFlipTiming();
  * Build amber overlay animation config that matches autoPlaying timing
  * Same phase percentages: Lift (20%) → Settle (15%) → Hold (65%)
  */
-export function buildAmberOverlayConfig(checkingDelay: number = GAME_TIMING.CHECKING_DELAY) {
-  const totalDuration = checkingDelay; // in ms
+export function buildAmberOverlayConfig(autoPlayDelay: number = GAME_TIMING.AUTO_PLAY_DELAY) {
+  const totalDuration = autoPlayDelay; // in ms
 
-  // Proportional phase percentages (matching autoPlaying animation)
-  const liftPercent = 0.20;
-  const settlePercent = 0.15;
-
-  const liftEnd = liftPercent;
-  const settleEnd = liftPercent + settlePercent;
+  // Calculate keyframe positions (matching autoPlaying animation)
+  const liftEnd = ANIMATION_LIFT_PHASE_PERCENT;
+  const settleEnd = ANIMATION_LIFT_PHASE_PERCENT + ANIMATION_SETTLE_PHASE_PERCENT;
 
   return {
     opacity: [0, 0.45, 0.4, 0.4],

@@ -23,21 +23,28 @@
 
 export const GAME_TIMING = {
   /**
-   * Delay before checking which cards are playable.
-   * Gives players a moment to see the current game state before action.
-   * Long enough to show auto-play amber highlight animation.
+   * Brief delay for decision logic in checkingCards state.
+   * Just long enough to show the current game state before routing.
+   * Reduced from 1000ms now that auto-play has its own animation state.
    */
-  CHECKING_DELAY: 1000,
+  CHECKING_DELAY: 200,
+
+  /**
+   * Delay for auto-play animation when exactly one card matches.
+   * Shows amber highlight and card preparation before playing.
+   * This is the dedicated animation window for auto-play.
+   */
+  AUTO_PLAY_DELAY: 1000,
 
   /**
    * Delay after drawing a card when player has no matches.
    * Shows the card moving from deck to hand and flipping.
    */
   DRAW_DELAY: 1155,
-  /**
-   * Visual breathing room
-   */
 
+  /**
+   * Visual breathing room for evaluating play and changing turns.
+   */
   EVALUATING_DELAY: 400,
   TURN_CHANGE_DELAY: 400,
 

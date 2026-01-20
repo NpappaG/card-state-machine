@@ -31,7 +31,7 @@ We evaluated three approaches:
 - Higher cognitive load
 
 #### Option B: Pragmatic Delays (Chosen)
-**Approach**: Wrap `always` transitions in `after: { DELAY: ... }` blocks with centralized timing constants.
+**Approach**: Replace `always` transitions with `after: { DELAY: [...guards] }` blocks with centralized timing constants.
 
 **Pros**:
 - Simple to implement and reason about
@@ -62,16 +62,17 @@ We chose **Option B** because:
 The timing constants live in `lib/constants.ts`:
 ```typescript
 export const GAME_TIMING = {
-  CHECKING_DELAY: 300,        // Before checking playable cards
-  AUTO_PLAY_DELAY: 600,       // After auto-playing card
-  DRAW_DELAY: 500,            // After drawing card
+  CHECKING_DELAY: 1000,       // Before checking playable cards
+  DRAW_DELAY: 1155,           // After drawing card
   EVALUATING_DELAY: 400,      // Before evaluating win conditions
-  TURN_CHANGE_DELAY: 500,     // During turn transition
+  TURN_CHANGE_DELAY: 400,     // During turn transition
   ROUND_DURATION_MS: 180000,  // 3-minute round timer
 } as const;
 ```
 
 ### How It Works
+
+We replaced instant `always` transitions with delayed `after` transitions that evaluate guards after a configurable delay.
 
 #### Before (Instant Cascade)
 ```typescript
@@ -89,39 +90,39 @@ checkingCards: {
 ```typescript
 checkingCards: {
   after: {
-    [GAME_TIMING.CHECKING_DELAY]: {  // Waits 300ms
-      always: [
-        { guard: 'hasSingleValidCard', target: 'evaluating', actions: 'autoPlaySingleCard' },
-        // ...
-      ],
-    },
+    checkingDelay: [  // Waits for delay, then evaluates guards
+      { guard: 'hasMultipleValidCards', target: 'selecting' },
+      { guard: 'hasSingleValidCard', target: 'evaluating', actions: 'autoPlaySingleCard' },
+      { guard: 'deckEmpty', target: '#cardGame.roundEnd' },
+      { target: 'drawing', actions: 'drawCard' },
+    ],
   },
 },
 ```
 
-**Result**: Each state is observable for its delay duration. Animations have time to play.
+**Result**: Each state is observable for its delay duration. Guards are evaluated after the delay. Animations have time to play.
 
 ### State Flow with Delays
 
 ```
 Player plays card
-    ↓
-selecting → evaluating (waits 400ms)
-    ↓
-changingTurn (waits 500ms)
-    ↓
-checkingCards (waits 300ms)
-    ↓
-[auto-play detected]
-    ↓
+    |
+selecting -> evaluating (waits 400ms)
+    |
+changingTurn (waits 400ms)
+    |
+checkingCards (waits 1000ms, evaluates guards)
+    |
+[auto-play detected by hasSingleValidCard guard]
+    |
 evaluating (waits 400ms, card flies to discard)
-    ↓
-changingTurn (waits 500ms)
-    ↓
-checkingCards (next player)
+    |
+changingTurn (waits 400ms)
+    |
+checkingCards (next player, waits 1000ms)
 ```
 
-**Total time for one auto-play**: ~1.6 seconds (vs. instant before).
+**Total time for one auto-play**: about 1.8 seconds with current defaults (checking + evaluating + turn change).
 
 ### Animation Coordination
 
@@ -196,7 +197,7 @@ console.log(snapshot.value); // 'roundActive.playerTurn.checkingCards'
 
 #### Pure Functions vs. Machine Wiring
 
-**Logic lives in `machines/cardGameLogic.ts`:**
+**Logic lives in `lib/cardGameLogic.ts`:**
 ```typescript
 // Pure, testable functions
 export function canPlaySelectedCards(context: GameContext): boolean {
@@ -256,63 +257,81 @@ playSelectedCards: assign(({ context }) => {
 }),
 ```
 
-All action reducers in `cardGameLogic.ts` are tested for immutability.
+All action reducers in `lib/cardGameLogic.ts` are tested for immutability.
 
 ### State Machine Structure
 
 ```
-idle
-  └─ 'game.start' → setup
+setup
+  └─ 'game.start' → roundActive
 
-setup (entry: initializeGame, startTimer)
-  └─ always → roundActive
+roundActive (invoke: timer actor, on: timer.expired → roundEnd)
+  ├─ playing
+  │   ├─ playerTurn (initial: checkingCards)
+  │   │     ├─ checkingCards (after CHECKING_DELAY + guards)
+  │   │     │     ├─ hasMultipleValidCards → selecting
+  │   │     │     ├─ hasSingleValidCard → evaluating (auto-play)
+  │   │     │     ├─ deckEmpty → roundEnd
+  │   │     │     └─ default → drawing
+  │   │     ├─ selecting
+  │   │     │     └─ 'card.play' (guard: canPlaySelectedCards) → evaluating
+  │   │     ├─ drawing (after DRAW_DELAY → evaluating)
+  │   │     ├─ evaluating (after EVALUATING_DELAY + guards)
+  │   │     │     ├─ currentPlayerHasNoCards → roundEnd
+  │   │     │     └─ default → changingTurn
+  │   │     └─ changingTurn (after TURN_CHANGE_DELAY → checkingCards)
+  │   └─ hist (history state for pause/resume)
+  └─ paused (on: 'round.resume' → hist)
 
-roundActive (invoke: timer actor, always guard: timerExpired → roundEnd)
-  └─ playerTurn (initial: checkingCards)
-        ├─ checkingCards (after 300ms)
-        │     ├─ no cards → roundEnd
-        │     ├─ multiple matches → selecting
-        │     ├─ single match → evaluating (auto-play)
-        │     └─ no matches → drawing
-        ├─ selecting
-        │     └─ 'card.play' (guard: valid) → evaluating
-        ├─ drawing (entry: drawCard, after 500ms → evaluating)
-        ├─ evaluating (after 400ms)
-        │     ├─ player empty → roundEnd
-        │     └─ else → changingTurn
-        └─ changingTurn (entry: advanceTurn, after 500ms → checkingCards)
-
-roundEnd (entry: calculateScores, type: final)
+roundEnd (entry: calculateScores)
 ```
 
 ### Timer Actor
 
-Uses `fromCallback` for the 3-minute round timer:
+The timer is a separate invoked machine (`timerMachine`) that owns all timer state:
 
+**Timer Machine States:**
+- `running`: Timer ticks every second, checks for expiration
+- `paused`: Timer frozen, waiting for resume
+- `expired`: Final state when time runs out
+
+**Timer Context:**
 ```typescript
-const timerLogic = fromCallback(({ sendBack }) => {
-  const interval = setInterval(() => {
-    sendBack({ type: 'timer.tick' });
-  }, 1000);
-  return () => clearInterval(interval);
-});
+{
+  durationMs: number,      // Total round duration (180000ms = 3 minutes)
+  startMs: number,         // performance.now() when timer started
+  remainingMs: number,     // Milliseconds remaining
+  pausedAt: number | null, // Timestamp when paused
+  accumulatedPauseTime: number // Total time spent paused
+}
 ```
 
-- Sends `timer.tick` every second
-- Machine updates `timerRemainingMs` on each tick
-- `always` guard checks `timerExpired` to end round
+**Communication:**
+- Game machine invokes timer with `invoke: { src: 'timer' }`
+- Game forwards pause/resume events to timer via `sendTo('timer', ...)`
+- Timer sends `timer.expired` event to parent when time runs out
+- React components read timer state via `useSelector` hook
+
+**State Separation:** Timer state lives entirely in the timer actor, not in game context. This eliminates state duplication and ensures single source of truth.
 
 ### React Integration
 
 ```typescript
-import { useMachine } from '@xstate/react';
+import { useMachine, useSelector } from '@xstate/react';
 import { cardGameMachine } from '@/machines/cardGameMachine';
+import { getTimerRemainingMs } from '@/lib/timerHelpers';
 
 function GameComponent() {
-  const [snapshot, send] = useMachine(cardGameMachine);
+  const [snapshot, send, actor] = useMachine(cardGameMachine);
 
-  // Access state
-  const isSelecting = snapshot.matches({ roundActive: { playerTurn: 'selecting' } });
+  // Access game state
+  const isSelecting = snapshot.matches({ roundActive: { playing: { playerTurn: 'selecting' } } });
+
+  // Access timer state from child actor using useSelector
+  const timerRemainingMs = useSelector(actor, (state) => {
+    const timerActor = state.children.timer;
+    return getTimerRemainingMs(timerActor);
+  });
 
   // Send events
   const handleCardClick = (cardId: string) => {
@@ -327,6 +346,7 @@ function GameComponent() {
 - Machine lives outside components (defined at module level)
 - Components are thin wrappers that render snapshots and send events
 - All game logic flows through the state machine (no logic in components)
+- Use `useSelector` to subscribe to child actor updates (otherwise React won't re-render on timer ticks)
 
 ---
 
@@ -336,8 +356,10 @@ function GameComponent() {
 card-state-machine/
 ├── machines/
 │   ├── cardGameMachine.ts      # State machine definition
-│   └── cardGameLogic.ts        # Pure guards/actions
+│   └── timerMachine.ts         # Timer actor machine
 ├── lib/
+│   ├── cardGameLogic.ts        # Pure guards/actions
+│   ├── timerHelpers.ts         # Timer actor helpers
 │   ├── types.ts                # TypeScript types
 │   ├── constants.ts            # Timing constants
 │   └── hooks/                  # React hooks (future)
