@@ -16,12 +16,17 @@ interface StateTreeVisualizerProps {
  * Fixed to the right side with collapse functionality
  */
 export function StateTreeVisualizer({ currentState, game }: StateTreeVisualizerProps) {
-  // Initialize from localStorage (lazy initializer pattern)
-  const [isCollapsed, setIsCollapsed] = useState(() => {
-    if (typeof window === 'undefined') return true; // SSR default
+  // Always start collapsed to match SSR (prevents hydration mismatch)
+  const [isCollapsed, setIsCollapsed] = useState(true);
+
+  // Read from localStorage after hydration
+  useEffect(() => {
     const stored = localStorage.getItem('xstate-visualizer-collapsed');
-    return stored === 'true';
-  });
+    if (stored !== null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Legitimate pattern to sync with localStorage after SSR hydration
+      setIsCollapsed(stored === 'true');
+    }
+  }, []); // Run once on mount
 
   // Persist collapse state to localStorage
   useEffect(() => {
@@ -82,6 +87,7 @@ export function StateTreeVisualizer({ currentState, game }: StateTreeVisualizerP
             <StateNode name="  playerTurn" isActive={isInState('playerTurn')} level={1} />
             <StateNode name="    checkingCards" isActive={isInState('checkingCards')} level={2} />
             <StateNode name="    selecting" isActive={isInState('selecting')} level={2} />
+            <StateNode name="    autoPlaying" isActive={isInState('autoPlaying')} level={2} />
             <StateNode name="    drawing" isActive={isInState('drawing')} level={2} />
             <StateNode name="    evaluating" isActive={isInState('evaluating')} level={2} />
             <StateNode name="    changingTurn" isActive={isInState('changingTurn')} level={2} />

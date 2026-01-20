@@ -18,9 +18,9 @@ export function useAnimations(game: UseCardGameReturn) {
   // Get dynamic timing from game machine context
   const timing = game.snapshot.context.timing;
 
-  // Detect auto-play during checkingCards phase (derived state, no effect needed)
+  // Detect auto-play during autoPlaying phase (derived state, no effect needed)
   const autoPlayingCards = useMemo(() => {
-    if (game.isCheckingCards && game.currentPlayer && game.discardPile.length > 0) {
+    if (game.isAutoPlaying && game.currentPlayer && game.discardPile.length > 0) {
       const topCard = game.discardPile[game.discardPile.length - 1];
       const matchingCards = game.currentPlayer.hand.filter(c => c.rank === topCard.rank);
 
@@ -30,7 +30,7 @@ export function useAnimations(game: UseCardGameReturn) {
       }
     }
     return [];
-  }, [game.isCheckingCards, game.currentPlayer, game.discardPile]);
+  }, [game.isAutoPlaying, game.currentPlayer, game.discardPile]);
 
   // Track cards that were just played (for exit animations)
   // Only update when entering evaluating state

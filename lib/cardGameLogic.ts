@@ -67,6 +67,27 @@ export function deckEmpty(context: GameContext): boolean {
   return context.deck.length === 0;
 }
 
+/**
+ * Check if no players have any cards matching the top discard.
+ * Used for stalemate detection when deck is empty.
+ */
+export function noPlayersHaveMatches(context: GameContext): boolean {
+  const topCard = context.discardPile[context.discardPile.length - 1];
+  if (!topCard) return false;
+
+  return context.players.every(player =>
+    player.hand.every(card => card.rank !== topCard.rank)
+  );
+}
+
+/**
+ * Check if the game is in stalemate: deck empty and no player can play.
+ * This prevents infinite loops where turns cycle but no one can make progress.
+ */
+export function isStalemate(context: GameContext): boolean {
+  return deckEmpty(context) && noPlayersHaveMatches(context);
+}
+
 // ============================================================================
 // HELPER FUNCTIONS (Pure)
 // ============================================================================

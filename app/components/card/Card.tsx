@@ -162,7 +162,7 @@ export function Card({
 
       {/* Auto-play indicator overlay */}
       {animationState === 'autoPlaying' && (() => {
-        const amberConfig = buildAmberOverlayConfig(timing.CHECKING_DELAY);
+        const amberConfig = buildAmberOverlayConfig(timing.AUTO_PLAY_DELAY);
         return (
           <motion.div
             className="absolute inset-0 rounded-xl bg-amber-100 pointer-events-none"

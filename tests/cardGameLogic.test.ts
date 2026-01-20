@@ -384,6 +384,100 @@ describe('deckEmpty', () => {
   });
 });
 
+describe('noPlayersHaveMatches', () => {
+  test('returns true when no player has matching cards', () => {
+    const topCard = makeCard('K', 'hearts');
+    const player1 = makePlayer([makeCard('2'), makeCard('3')]);
+    const player2 = makePlayer([makeCard('4'), makeCard('5')]);
+
+    const context = makeContext({
+      players: [player1, player2],
+      discardPile: [topCard],
+    });
+
+    expect(Logic.noPlayersHaveMatches(context)).toBe(true);
+  });
+
+  test('returns false when at least one player has a match', () => {
+    const topCard = makeCard('K', 'hearts');
+    const player1 = makePlayer([makeCard('2'), makeCard('3')]);
+    const player2 = makePlayer([makeCard('K', 'spades'), makeCard('5')]);
+
+    const context = makeContext({
+      players: [player1, player2],
+      discardPile: [topCard],
+    });
+
+    expect(Logic.noPlayersHaveMatches(context)).toBe(false);
+  });
+
+  test('returns false when multiple players have matches', () => {
+    const topCard = makeCard('7', 'hearts');
+    const player1 = makePlayer([makeCard('7', 'spades'), makeCard('3')]);
+    const player2 = makePlayer([makeCard('7', 'diamonds'), makeCard('5')]);
+
+    const context = makeContext({
+      players: [player1, player2],
+      discardPile: [topCard],
+    });
+
+    expect(Logic.noPlayersHaveMatches(context)).toBe(false);
+  });
+
+  test('returns false when discard pile is empty', () => {
+    const player1 = makePlayer([makeCard('2'), makeCard('3')]);
+
+    const context = makeContext({
+      players: [player1],
+      discardPile: [],
+    });
+
+    expect(Logic.noPlayersHaveMatches(context)).toBe(false);
+  });
+});
+
+describe('isStalemate', () => {
+  test('returns true when deck empty and no players have matches', () => {
+    const topCard = makeCard('K', 'hearts');
+    const player1 = makePlayer([makeCard('2'), makeCard('3')]);
+    const player2 = makePlayer([makeCard('4'), makeCard('5')]);
+
+    const context = makeContext({
+      players: [player1, player2],
+      discardPile: [topCard],
+      deck: [],
+    });
+
+    expect(Logic.isStalemate(context)).toBe(true);
+  });
+
+  test('returns false when deck has cards', () => {
+    const topCard = makeCard('K', 'hearts');
+    const player1 = makePlayer([makeCard('2'), makeCard('3')]);
+
+    const context = makeContext({
+      players: [player1],
+      discardPile: [topCard],
+      deck: [makeCard('A')],
+    });
+
+    expect(Logic.isStalemate(context)).toBe(false);
+  });
+
+  test('returns false when someone has a match', () => {
+    const topCard = makeCard('K', 'hearts');
+    const player1 = makePlayer([makeCard('K', 'spades'), makeCard('3')]);
+
+    const context = makeContext({
+      players: [player1],
+      discardPile: [topCard],
+      deck: [],
+    });
+
+    expect(Logic.isStalemate(context)).toBe(false);
+  });
+});
+
 // ============================================================================
 // Action Reducer Tests: Immutability & Behavior
 // ============================================================================

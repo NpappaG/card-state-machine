@@ -1,12 +1,12 @@
 import { GAME_TIMING } from '@/lib/constants';
 
 /**
- * Build autoPlaying animation with timing calculated from CHECKING_DELAY
+ * Build autoPlaying animation with timing calculated from AUTO_PLAY_DELAY
  * Phases: Lift (20%) → Settle (15%) → Hold (65%)
  * All phases scale proportionally with the total duration
  */
-function buildAutoPlayingAnimation(checkingDelay: number = GAME_TIMING.CHECKING_DELAY) {
-  const totalDuration = checkingDelay; // in ms
+function buildAutoPlayingAnimation(autoPlayDelay: number = GAME_TIMING.AUTO_PLAY_DELAY) {
+  const totalDuration = autoPlayDelay; // in ms
 
   // Proportional phase percentages (instead of fixed milliseconds)
   const liftPercent = 0.20;    // 20% for lift
@@ -37,10 +37,14 @@ function buildAutoPlayingAnimation(checkingDelay: number = GAME_TIMING.CHECKING_
  */
 export function buildCardAnimationVariants(timing?: {
   CHECKING_DELAY?: number;
+  AUTO_PLAY_DELAY?: number;
   DRAW_DELAY?: number;
   EVALUATING_DELAY?: number;
 }) {
-  const checkingDelay = timing?.CHECKING_DELAY ?? GAME_TIMING.CHECKING_DELAY;
+  const autoPlayDelay =
+    timing?.AUTO_PLAY_DELAY ??
+    timing?.CHECKING_DELAY ??
+    GAME_TIMING.AUTO_PLAY_DELAY;
   const drawDelay = timing?.DRAW_DELAY ?? GAME_TIMING.DRAW_DELAY;
   const evaluatingDelay = timing?.EVALUATING_DELAY ?? GAME_TIMING.EVALUATING_DELAY;
 
@@ -59,7 +63,7 @@ export function buildCardAnimationVariants(timing?: {
       rotate: 0,
       opacity: 1,
     },
-    autoPlaying: buildAutoPlayingAnimation(checkingDelay),
+    autoPlaying: buildAutoPlayingAnimation(autoPlayDelay),
     entering: {
       scale: [0.7, 1.05, 0.98, 1],
       y: [-200, 0, -5, 0],
@@ -144,8 +148,8 @@ export const CARD_FLIP_TIMING = buildCardFlipTiming();
  * Build amber overlay animation config that matches autoPlaying timing
  * Same phase percentages: Lift (20%) → Settle (15%) → Hold (65%)
  */
-export function buildAmberOverlayConfig(checkingDelay: number = GAME_TIMING.CHECKING_DELAY) {
-  const totalDuration = checkingDelay; // in ms
+export function buildAmberOverlayConfig(autoPlayDelay: number = GAME_TIMING.AUTO_PLAY_DELAY) {
+  const totalDuration = autoPlayDelay; // in ms
 
   // Proportional phase percentages (matching autoPlaying animation)
   const liftPercent = 0.20;

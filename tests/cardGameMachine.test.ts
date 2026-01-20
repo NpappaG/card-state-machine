@@ -333,14 +333,16 @@ test('readyToAct routes to drawing when DRAW_REQUIRED raised (no matches, deck h
   // Expected flow: checkingCards -> readyToAct -> DRAW_REQUIRED -> drawing
 });
 
-test('readyToAct routes to roundEnd when ROUND_END raised (deck empty, no matches)', () => {
+test('checkingCards routes to roundEnd when stalemate (deck empty, no one can play)', () => {
   const topCard = makeCard('K');
-  const player = makePlayer([makeCard('2'), makeCard('3')]); // No matches
+  const player1 = makePlayer([makeCard('2'), makeCard('3')]); // No matches
+  const player2 = makePlayer([makeCard('4'), makeCard('5')]); // No matches
 
   const actor = buildActor(
     { roundActive: { playing: { playerTurn: 'checkingCards' } } },
     {
-      players: [player],
+      players: [player1, player2],
+      currentPlayerIndex: 0,
       discardPile: [topCard],
       deck: [], // Empty deck
     }
@@ -352,6 +354,30 @@ test('readyToAct routes to roundEnd when ROUND_END raised (deck empty, no matche
   // Should be in checkingCards initially
   expect(snapshot.matches({ roundActive: { playing: { playerTurn: 'checkingCards' } } })).toBe(true);
 
-  // Expected flow: checkingCards -> readyToAct -> ROUND_END -> roundEnd
-  // This prevents infinite loops when no one can play
+  // Expected flow: checkingCards -> roundEnd (stalemate detected)
+  // This prevents infinite loops when no one can make progress
+});
+
+test('checkingCards routes to changingTurn when deck empty but someone has matches', () => {
+  const topCard = makeCard('K');
+  const player1 = makePlayer([makeCard('2'), makeCard('3')]); // No matches
+  const player2 = makePlayer([makeCard('K', 'spades'), makeCard('5')]); // Has match!
+
+  const actor = buildActor(
+    { roundActive: { playing: { playerTurn: 'checkingCards' } } },
+    {
+      players: [player1, player2],
+      currentPlayerIndex: 0,
+      discardPile: [topCard],
+      deck: [], // Empty deck
+    }
+  );
+
+  const snapshot = actor.getSnapshot();
+  actor.stop();
+
+  // Should be in checkingCards initially
+  expect(snapshot.matches({ roundActive: { playing: { playerTurn: 'checkingCards' } } })).toBe(true);
+
+  // Expected flow: checkingCards -> changingTurn (skip current player, player2 can play next)
 });

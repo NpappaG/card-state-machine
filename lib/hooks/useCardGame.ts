@@ -27,6 +27,7 @@ export function useCardGame() {
       type: 'timing.update',
       timing: {
         CHECKING_DELAY: timing.CHECKING_DELAY,
+        AUTO_PLAY_DELAY: timing.AUTO_PLAY_DELAY,
         DRAW_DELAY: timing.DRAW_DELAY,
         EVALUATING_DELAY: timing.EVALUATING_DELAY,
         TURN_CHANGE_DELAY: timing.TURN_CHANGE_DELAY,
@@ -35,6 +36,7 @@ export function useCardGame() {
     });
   }, [
     timing.CHECKING_DELAY,
+    timing.AUTO_PLAY_DELAY,
     timing.DRAW_DELAY,
     timing.EVALUATING_DELAY,
     timing.TURN_CHANGE_DELAY,
@@ -86,6 +88,7 @@ export function useCardGame() {
     isPaused: snapshot.matches({ roundActive: 'paused' }),
     isPlaying: snapshot.matches({ roundActive: 'playing' }),
     isCheckingCards: snapshot.matches({ roundActive: { playing: { playerTurn: 'checkingCards' } } }),
+    isAutoPlaying: snapshot.matches({ roundActive: { playing: { playerTurn: 'autoPlaying' } } }),
     isSelecting: snapshot.matches({ roundActive: { playing: { playerTurn: 'selecting' } } }),
     isDrawing: snapshot.matches({ roundActive: { playing: { playerTurn: 'drawing' } } }),
     isEvaluating: snapshot.matches({ roundActive: { playing: { playerTurn: 'evaluating' } } }),

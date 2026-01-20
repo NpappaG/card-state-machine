@@ -5,6 +5,7 @@ import { GAME_TIMING as DEFAULT_TIMING } from '@/lib/constants';
 
 interface TimingContextType {
   CHECKING_DELAY: number;
+  AUTO_PLAY_DELAY: number;
   DRAW_DELAY: number;
   EVALUATING_DELAY: number;
   TURN_CHANGE_DELAY: number;
@@ -17,6 +18,7 @@ const TimingContext = createContext<TimingContextType | undefined>(undefined);
 export function TimingProvider({ children }: { children: ReactNode }) {
   const [timing, setTiming] = useState({
     CHECKING_DELAY: DEFAULT_TIMING.CHECKING_DELAY,
+    AUTO_PLAY_DELAY: DEFAULT_TIMING.AUTO_PLAY_DELAY,
     DRAW_DELAY: DEFAULT_TIMING.DRAW_DELAY,
     EVALUATING_DELAY: DEFAULT_TIMING.EVALUATING_DELAY,
     TURN_CHANGE_DELAY: DEFAULT_TIMING.TURN_CHANGE_DELAY,

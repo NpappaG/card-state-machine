@@ -26,13 +26,13 @@ Standard 52-card deck in play.
 - **Initial Deal**: Each player receives 5 cards
 - **Starting Card**: One additional card is revealed to seed the discard pile
 - **First Player**: Randomly selected
-- **Timer**: Optional 3-minute round timer limits play
+- **Timer**: A 3-minute round timer limits play
 
 ### Turn Loop
 
 1. **Selecting** – If multiple cards match the top discard rank, the player can select/deselect those cards and press SPACE/“Play Selected” to place one or more matching cards on the discard pile.
 2. **Auto-play** – If the active player has exactly one card that matches the rank of the top discard card, it is played automatically.
-3. **Drawing** – If no matching cards exist, the player draws one card from the deck. Play immediately advances to the next player.
+3. **Drawing** – If no matching cards exist, the player draws one card from the deck. The turn then advances to the next player; the player cannot play the newly drawn card in the same turn.
 
 This loop repeats in player order until a hand empties, the timer expires, or the deck runs out.
 
@@ -46,19 +46,17 @@ This loop repeats in player order until a hand empties, the timer expires, or th
 
 ```
 setup
-  └─ 'game.start' (actions: initializeGame + startTimer) → roundActive
+  └─ 'game.start' (actions: initializeGame) → roundActive
 
 roundActive (invoke timer)
   └─ playerTurn
-        checkingCards
+        checkingCards (200ms - fast decision routing)
           ├─ no cards → roundEnd
           ├─ multiple matches → selecting
-          ├─ single match → evaluating (auto-play)
+          ├─ single match → autoPlaying
           └─ no matches → drawing
-        (Note: checkingCards has a topline delay that applies to all branches.
-         In the current architecture, this enables the auto-play amber highlight
-         animation but also delays manual selection and drawing paths. A potential
-         optimization would move the delay into the auto-play branch only.)
+        autoPlaying (1000ms - dedicated animation window)
+          └─ after AUTO_PLAY_DELAY / autoPlaySingleCard → evaluating
         selecting
           └─ 'card.play' (guard: canPlaySelectedCards) → evaluating
         drawing (entry: drawCard)
@@ -84,13 +82,14 @@ The state machine controls all timing via `GAME_TIMING` constants in `/lib/const
 
 **Current timing window values (from `/lib/constants.ts`):**
 
-| Segment          | Constant                      | Duration (ms) | Purpose                                                  |
-| ---------------- | ----------------------------- | ------------- | -------------------------------------------------------- |
-| Check playable   | `GAME_TIMING.CHECKING_DELAY`  | 1000          | Buffer before any auto-play/select/draw action           |
-| Draw animation   | `GAME_TIMING.DRAW_DELAY`      | 1155          | Covers deck-to-hand travel + flip                       |
-| Evaluate result  | `GAME_TIMING.EVALUATING_DELAY`| 400           | Lets discard animations finish + checks win condition    |
-| Turn highlight   | `GAME_TIMING.TURN_CHANGE_DELAY`| 400          | Gives UI time to highlight the next player               |
-| Round timer      | `GAME_TIMING.ROUND_DURATION_MS`| 180000       | 3-minute round duration                                  |
+| Segment          | Constant                        | Duration (ms) | Purpose                                                  |
+| ---------------- | ------------------------------- | ------------- | -------------------------------------------------------- |
+| Decision routing | `GAME_TIMING.CHECKING_DELAY`    | 200           | Fast routing to appropriate state                        |
+| Auto-play anim   | `GAME_TIMING.AUTO_PLAY_DELAY`   | 1000          | Dedicated animation window for auto-playing single card  |
+| Draw animation   | `GAME_TIMING.DRAW_DELAY`        | 1155          | Covers deck-to-hand travel + flip                       |
+| Evaluate result  | `GAME_TIMING.EVALUATING_DELAY`  | 400           | Lets discard animations finish + checks win condition    |
+| Turn highlight   | `GAME_TIMING.TURN_CHANGE_DELAY` | 400           | Gives UI time to highlight the next player               |
+| Round timer      | `GAME_TIMING.ROUND_DURATION_MS` | 180000        | 3-minute round duration                                  |
 
 **Proportional Animation System:**
 
@@ -99,19 +98,19 @@ Animations calculate their keyframe timing proportionally based on fixed phase d
 ```typescript
 // Animation builder calculates timing from state duration
 function buildAutoPlayingAnimation() {
-  const totalDuration = GAME_TIMING.CHECKING_DELAY; // 2000ms
+  const totalDuration = GAME_TIMING.AUTO_PLAY_DELAY; // 1000ms
   const liftDuration = 400;   // Fixed: lift phase
   const settleDuration = 300; // Fixed: settle phase
-  // Hold phase = remainder (1300ms)
+  // Hold phase = remainder (300ms)
 
   // Calculate proportional keyframe positions
-  const liftEnd = liftDuration / totalDuration;     // 0.2 (20%)
-  const settleEnd = (lift + settle) / totalDuration; // 0.35 (35%)
+  const liftEnd = liftDuration / totalDuration;     // 0.4 (40%)
+  const settleEnd = (liftDuration + settleDuration) / totalDuration; // 0.7 (70%)
 
   return {
     scale: [1, 1.1, 1.08, 1.08],
     transition: {
-      duration: totalDuration / 1000, // 2s
+      duration: totalDuration / 1000, // 1s
       times: [0, liftEnd, settleEnd, 1], // Calculated, not hardcoded
     },
   };
@@ -131,32 +130,31 @@ This is **time-based coordination** (not event-driven). The state machine is the
 - Invoked actors (XState owns animation lifecycle) would couple state machine to UI layer
 - Current approach: Simple, maintainable, deterministic - good fit for fixed-duration game animations
 
-**Known Trade-off: Topline Delay**
+**Optimized State Routing:**
 
-The `checkingCards` state has a 1000ms delay that applies to ALL branches (auto-play, selection, drawing). This creates a "topline bottleneck":
+The state machine uses a dedicated `autoPlaying` state to isolate the animation delay:
 
-- **Auto-play path**: ✅ Needs the 1s buffer for the amber highlight animation
-- **Manual selection path**: ⚠️ Adds a short pause before the user can click
-- **Drawing path**: ⚠️ Adds a short pause before the draw animation begins
+- **checkingCards** (200ms): Fast decision logic routes to appropriate state
+- **autoPlaying** (1000ms): Dedicated animation window for auto-play path only
+- **selecting/drawing**: Immediate responsiveness - no artificial delays
 
-**Why keep it:**
+This architecture eliminates the "topline bottleneck" where all paths shared the same delay. Now:
+- ✅ **Auto-play path**: Has dedicated 1s animation window
+- ✅ **Manual selection**: Immediately responsive (200ms routing only)
+- ✅ **Drawing path**: Immediately responsive (200ms routing only)
 
-- Simplifies state machine structure (single delay point vs. per-branch delays)
-- Round timer continues during the delay, adding time pressure
-- Auto-play animation still has a predictable window
-
-**Current implementation:**
-Uses guarded transitions directly in `checkingCards` for cleaner, more declarative routing:
+**Implementation:**
+Uses guarded transitions in `checkingCards` for declarative routing:
 
 ```
-checkingCards (CHECKING_DELAY)
-  ├─ hasMultipleValidCards → selecting
-  ├─ hasSingleValidCard → evaluating (auto-play)
+checkingCards (200ms)
+  ├─ hasMultipleValidCards → selecting (responsive!)
+  ├─ hasSingleValidCard → autoPlaying (1000ms animation)
   ├─ deckEmpty → roundEnd
-  └─ default → drawing
+  └─ default → drawing (responsive!)
 ```
 
-This eliminates internal events and the intermediate `readyToAct` state.
+This separates decision logic from animation timing, following the principle that each state should represent a distinct phase.
 
 ## State Machine Schema
 
@@ -179,7 +177,8 @@ This eliminates internal events and the intermediate `readyToAct` state.
 - `roundActive`
   - `playing`
     - `playerTurn`
-      - `checkingCards`: evaluates guards after delay, routes to appropriate state
+      - `checkingCards`: fast decision routing (200ms)
+      - `autoPlaying`: dedicated auto-play animation state (1000ms)
       - `selecting`: player chooses matching cards (multi-card selection supported)
       - `drawing`: forced draw animation
       - `evaluating`: check win condition or continue
@@ -207,15 +206,17 @@ This eliminates internal events and the intermediate `readyToAct` state.
 - `currentPlayerHasNoCards`: Active player's hand is empty (win condition)
 - `hasMultipleValidCards`: Player has 2+ cards matching top discard
 - `hasSingleValidCard`: Player has exactly 1 card matching top discard
-- `deckEmpty`: No cards left to draw (stalemate condition)
+- `deckEmpty`: Used when the draw pile is empty. This may lead to a turn skip.
+- `isStalemate`: A more specific check for when the deck is empty AND no player can make a valid move. This ends the round.
 
 ### Key Transitions
 - `setup` --`game.start`--> `roundActive`
-- `checkingCards` --after `CHECKING_DELAY` + guards-->
+- `checkingCards` --after `CHECKING_DELAY` (200ms) + guards-->
   - `hasMultipleValidCards` → `selecting`
-  - `hasSingleValidCard` → `evaluating` (auto-play)
+  - `hasSingleValidCard` → `autoPlaying`
   - `deckEmpty` → `roundEnd`
   - default → `drawing`
+- `autoPlaying` --after `AUTO_PLAY_DELAY` (1000ms) + `autoPlaySingleCard`--> `evaluating`
 - `drawing` --after `DRAW_DELAY`--> `evaluating`
 - `evaluating` --`currentPlayerHasNoCards`--> `roundEnd`
 - `evaluating` --else--> `changingTurn`
@@ -236,6 +237,28 @@ This app uses two XState machines:
 - `machines/timerMachine.ts` owns round timing and emits `timer.expired`.
 
 Pure helpers live in `lib/cardGameLogic.ts` (game rules/reducers) and `lib/timerHelpers.ts` (timer actor accessors).
+
+## Architectural Decisions
+
+This project's architecture evolved to prioritize clarity, maintainability, and a positive user experience. The following are key design decisions that shape the implementation:
+
+### 1. Time-Based Pacing over Event-Based Coordination
+
+**Problem:** Initial versions of the machine executed state transitions instantly, causing a "cascade" where multiple turns could happen in milliseconds without the UI updating.
+
+**Solution:** We chose a "pragmatic delays" approach, using XState's `after` delays to create observable states. The state machine acts as the "clock," and UI animations are subordinate to its timing. This provides consistent, predictable pacing without the complexity of a fully event-driven system where the UI would need to send `animation.complete` events back to the machine. This decision is detailed further in `docs/ARCHITECTURE.md`.
+
+### 2. Guard-Based Routing over Internal Events
+
+**Problem:** Decision-making (e.g., auto-play vs. manual selection vs. drawing) could be modeled in several ways. An early version used an intermediate `readyToAct` state that would `raise()` internal events.
+
+**Solution:** The machine was refactored to use a more direct and declarative pattern. The `checkingCards` state now uses a prioritized list of guarded transitions. This simplifies the statechart by removing a state and internal events, making the decision logic easier to read and maintain directly within the machine definition.
+
+### 3. Dedicated Timer Actor
+
+**Problem:** Timer logic and game logic are separate concerns. Mixing them in the same machine's context can lead to synchronization issues and a violation of the single-source-of-truth principle.
+
+**Solution:** The round timer is encapsulated in its own `timerMachine`. The main game machine invokes this actor and only listens for a single `timer.expired` event. All timer-related state (remaining time, pause state) is owned exclusively by the timer actor, ensuring a clean separation of concerns.
 
 ## Tech Stack
 

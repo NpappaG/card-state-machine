@@ -43,6 +43,7 @@ export type GameContext = {
   // Timing configuration (dynamic)
   timing: {
     CHECKING_DELAY: number;
+    AUTO_PLAY_DELAY: number;
     DRAW_DELAY: number;
     EVALUATING_DELAY: number;
     TURN_CHANGE_DELAY: number;
