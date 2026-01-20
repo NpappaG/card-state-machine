@@ -1,10 +1,11 @@
 ## Overview
 
-You are designing the state machine architecture for a turn based card game system.
+This document outlines the requirements for a turn-based card game system using XState v5.
 
 ## Game Mechanics
 
-Achieve the lowest total hand value or dispose of all your cards before the 3-minute round timer expires.
+*   **Objective**: Be the first to discard all your cards, or have the lowest total hand value when the 3-minute round timer expires.
+*   **Card Play**: Players alternate placing cards on a shared discard pile. You can only play cards that have the same rank as the top card of the discard pile. If you cannot play a match, you must take another card from the deck.
 
 ### Scoring System
 

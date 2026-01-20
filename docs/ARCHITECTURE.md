@@ -31,7 +31,7 @@ We evaluated three approaches:
 - Higher cognitive load
 
 #### Option B: Pragmatic Delays (Chosen)
-**Approach**: Wrap `always` transitions in `after: { DELAY: ... }` blocks with centralized timing constants.
+**Approach**: Replace `always` transitions with `after: { DELAY: [...guards] }` blocks with centralized timing constants.
 
 **Pros**:
 - Simple to implement and reason about
@@ -72,6 +72,8 @@ export const GAME_TIMING = {
 
 ### How It Works
 
+We replaced instant `always` transitions with delayed `after` transitions that evaluate guards after a configurable delay.
+
 #### Before (Instant Cascade)
 ```typescript
 checkingCards: {
@@ -88,7 +90,7 @@ checkingCards: {
 ```typescript
 checkingCards: {
   after: {
-    checkingDelay: [
+    checkingDelay: [  // Waits for delay, then evaluates guards
       { guard: 'hasMultipleValidCards', target: 'selecting' },
       { guard: 'hasSingleValidCard', target: 'evaluating', actions: 'autoPlaySingleCard' },
       { guard: 'deckEmpty', target: '#cardGame.roundEnd' },
@@ -98,7 +100,7 @@ checkingCards: {
 },
 ```
 
-**Result**: Each state is observable for its delay duration. Guards route to appropriate states after delay. Animations have time to play.
+**Result**: Each state is observable for its delay duration. Guards are evaluated after the delay. Animations have time to play.
 
 ### State Flow with Delays
 

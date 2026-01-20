@@ -93,7 +93,7 @@ roundActive (invoke timer actor)
 
 roundEnd
   ├─ entry: calculateScores
-  ├─ game.newRound → roundActive
+  ├─ round.start → roundActive
   └─ game.over → setup
 ```
 
@@ -101,7 +101,7 @@ roundEnd
 
 **External events (from UI or system):**
 - `game.start` - Start new game with player configuration
-- `game.newRound` - Restart with same players, new deck
+- `round.start` - Restart with same players, new deck
 - `game.over` - End game, return to setup
 - `card.select` - Mark card as selected
 - `card.deselect` - Unmark card

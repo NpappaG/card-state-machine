@@ -6,12 +6,10 @@ import { timerMachine } from "./timerMachine";
 
 const TIMER_TICK_MS = 1000;
 
-type InternalEvent = { type: "timing.update"; timing: GameContext['timing'] };
-
 const getRoundStartMs = (
-  event: GameEvent | InternalEvent | undefined
+  event: GameEvent | undefined
 ): number => {
-  if (event && (event.type === "game.start" || event.type === "game.newRound")) {
+  if (event && (event.type === "game.start" || event.type === "round.start")) {
     return event.timestamp;
   }
   return performance.now();
@@ -20,7 +18,7 @@ const getRoundStartMs = (
 export const cardGameMachine = setup({
   types: {
     context: {} as GameContext,
-    events: {} as GameEvent | InternalEvent,
+    events: {} as GameEvent,
   },
   actors: {
     timer: timerMachine,
@@ -88,7 +86,7 @@ export const cardGameMachine = setup({
 
     updateTimingConfig: assign(({ event }) => {
       // Machine structure guarantees this is only called on timing.update
-      const updateEvent = event as Extract<InternalEvent, { type: "timing.update" }>;
+      const updateEvent = event as Extract<GameEvent, { type: "timing.update" }>;
       return { timing: updateEvent.timing };
     }),
   },
@@ -300,7 +298,7 @@ export const cardGameMachine = setup({
     roundEnd: {
       entry: "calculateScores",
       on: {
-        "game.newRound": {
+        "round.start": {
           target: "roundActive",
           actions: "restartRound",
         },

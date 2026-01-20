@@ -86,7 +86,7 @@ export default function GamePage() {
   };
 
   const handlePlayAgain = () => {
-    game.send({ type: "game.newRound", timestamp: performance.now() });
+    game.send({ type: "round.start", timestamp: performance.now() });
   };
 
   const handleEndGame = () => {
@@ -157,9 +157,19 @@ export default function GamePage() {
             <p className="text-center text-gray-600">
               Pass-and-play card game for 2-4 players
             </p>
-            <p className="text-sm text-center text-gray-500">
-              Match cards by rank. First to empty their hand wins!
-            </p>
+            <ul className="text-sm text-gray-600 list-disc list-inside text-left space-y-2 max-w-sm">
+              <li>
+                <strong>Objective:</strong> Be the first to discard all cards, or
+                have the lowest score when the timer ends.
+              </li>
+              <li>
+                <strong>Card Play:</strong> Match a card's rank to the top card
+                of the discard pile.
+              </li>
+              <li>
+                If you can't play a card, you must draw from the deck.
+              </li>
+            </ul>
 
             <div className="flex flex-col gap-3">
               <label className="text-sm font-medium text-gray-700">
@@ -435,65 +445,68 @@ export default function GamePage() {
 
           {/* Players' hands */}
           <div className="flex flex-col gap-4">
-            {game.players.map((player, idx) => {
-              const isCurrentPlayer = idx === game.currentPlayerIndex;
-
-              return (
-                <div
-                  key={player.id}
-                  className={`
-                  rounded-lg p-4 transition-colors
-                  ${
-                    isCurrentPlayer
-                      ? "bg-blue-600/20 ring-2 ring-blue-400"
-                      : "bg-white/10"
-                  }
-                `}
-                >
-                  <div className="mb-2 flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-white">
-                      {player.name}
-                    </h3>
-                    <span className="text-sm text-white/80">
-                      {player.hand.length} cards
-                    </span>
-                  </div>
-
-                  {/* Player's hand */}
-                  <div className="flex flex-wrap gap-2">
-                    {player.hand.map((card) => {
-                      let animState = animations.getCardAnimationState(
-                        card.id
-                      );
-                      const isSelected = game.isCardSelected(card.id);
-                      const canInteract =
-                        isCurrentPlayer &&
-                        game.isSelecting &&
-                        (game.isCardSelected(card.id) ||
-                          card.rank === game.topDiscard?.rank);
-
-                      // Override with shake if this card should shake
-                      if (shakingCards.has(card.id)) {
-                        animState = 'shake';
-                      }
-
-                      return (
-                        <Card
-                          key={card.id}
-                          card={card}
-                          isSelected={isSelected}
-                          isDisabled={!canInteract}
-                          animationState={animState}
-                          onClick={() => handleCardClick(card.id)}
-                          layoutId={card.id}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                                {game.players.map((player, idx) => {
+                                  const isCurrentPlayer = idx === game.currentPlayerIndex;
+            
+                                  return (
+                                    <div
+                                      key={player.id}
+                                      className={`
+                              rounded-lg p-4 transition-colors
+                              ${
+                                isCurrentPlayer
+                                  ? "bg-blue-600/20 ring-2 ring-blue-400"
+                                  : "bg-white/10"
+                              }
+                            `}
+                                    >
+                                      <div className="mb-2 flex items-center justify-between">
+                                        <h3 className="text-lg font-semibold text-white">
+                                          {player.name}
+                                        </h3>
+                                        <span className="text-sm text-white/80">
+                                          {player.hand.length} cards
+                                        </span>
+                                      </div>
+            
+                                      {/* Player's hand */}
+                                      <div className="flex flex-wrap gap-2">
+                                        {player.hand.map((card) => {
+                                          let animState = animations.getCardAnimationState(
+                                            card.id
+                                          );
+                                          const isSelected = game.isCardSelected(card.id);
+                                          const canInteract =
+                                            isCurrentPlayer &&
+                                            game.isSelecting &&
+                                            (game.isCardSelected(card.id) ||
+                                              card.rank === game.topDiscard?.rank);
+            
+                                          // Override with shake if this card should shake
+                                          if (shakingCards.has(card.id)) {
+                                            animState = 'shake';
+                                          }
+            
+                                          // Determine if card should be face down
+                                          const renderFaceDown = !isCurrentPlayer;
+            
+                                          return (
+                                            <Card
+                                              key={card.id}
+                                              card={card}
+                                              isSelected={isSelected}
+                                              isDisabled={!canInteract}
+                                              animationState={animState}
+                                              onClick={() => handleCardClick(card.id)}
+                                              layoutId={card.id}
+                                              faceDown={renderFaceDown} // Pass the new prop
+                                            />
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  );
+                                })}          </div>
         </div>
 
         {/* Pause Overlay */}

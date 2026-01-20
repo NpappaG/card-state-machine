@@ -13,6 +13,7 @@ interface CardProps {
   onClick?: () => void;
   layoutId?: string;
   disabled?: boolean;
+  faceDown?: boolean;
 }
 
 // Suit symbols
@@ -50,6 +51,7 @@ export function Card({
   onClick,
   layoutId,
   disabled = false,
+  faceDown = false,
 }: CardProps) {
   const timing = useTiming();
   const suitSymbol = SUIT_SYMBOLS[card.suit];
@@ -68,111 +70,126 @@ export function Card({
       : 'shadow-lg';
 
   return (
-    <motion.button
-      className={`
-        relative flex flex-col items-center overflow-hidden rounded-xl border-2 transition-all
-        bg-white border-gray-300 ${glowShadow}
-        ${isSelected ? 'border-blue-500 ring-4 ring-blue-300' : ''}
-        ${animationState === 'autoPlaying' ? 'border-yellow-400 ring-4 ring-yellow-300' : ''}
-        ${isActuallyDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:shadow-xl'}
-        ${animationState === 'exiting' || animationState === 'entering' || animationState === 'autoPlaying' ? 'pointer-events-none' : ''}
-      `}
-      variants={cardAnimationVariants}
-      initial={animationState === 'entering' ? cardDrawInitialState : "idle"}
-      animate={isSelected ? 'selected' : animationState}
-      whileHover={!isActuallyDisabled && !isSelected ? { scale: 1.02 } : undefined}
-      whileTap={!isActuallyDisabled ? { scale: 0.98 } : undefined}
-      onClick={!isActuallyDisabled ? onClick : undefined}
-      disabled={isActuallyDisabled}
-      layout
-      layoutId={layoutId}
-      style={{
-        width: '100px',
-        height: '140px',
-        padding: '6px',
-        transformStyle: 'preserve-3d',
-      }}
-    >
-      {/* Card back design (shown when entering/face-down) */}
-      {animationState === 'entering' && (
-        <motion.div
-          className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl"
-          style={{ zIndex: 50 }}
-          initial={{ opacity: 1 }}
-          animate={{ opacity: 0 }}
-          transition={{
-            delay: cardFlipTiming.blueBackDelay,
-            duration: cardFlipTiming.blueBackDuration,
+          <motion.button
+            className={`
+            relative flex flex-col items-center overflow-hidden rounded-xl border-2 transition-all
+            ${faceDown
+              ? 'bg-gradient-to-br from-blue-600 to-blue-800 border-blue-400/70 shadow-[0_0_25px_rgba(59,130,246,0.5)]' // Darker blue back styling
+              : `bg-white border-gray-300 ${glowShadow}` // Existing face-up styling
+            }
+            ${isSelected ? 'border-blue-500 ring-4 ring-blue-300' : ''}
+            ${animationState === 'autoPlaying' ? 'border-yellow-400 ring-4 ring-yellow-300' : ''}
+            ${isActuallyDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:shadow-xl'}
+            ${animationState === 'exiting' || animationState === 'entering' || animationState === 'autoPlaying' ? 'pointer-events-none' : ''}
+          `}
+          variants={cardAnimationVariants}
+          initial={animationState === 'entering' ? cardDrawInitialState : "idle"}
+          animate={isSelected ? 'selected' : animationState}
+          whileHover={!isActuallyDisabled && !isSelected ? { scale: 1.02 } : undefined}
+          whileTap={!isActuallyDisabled ? { scale: 0.98 } : undefined}
+          onClick={!isActuallyDisabled ? onClick : undefined}
+          disabled={isActuallyDisabled}
+          layout
+          layoutId={layoutId}
+          style={{
+            width: '100px',
+            height: '140px',
+            padding: '6px',
+            transformStyle: 'preserve-3d',
           }}
         >
-          <div className="absolute inset-2 rounded-lg border-2 border-blue-400/30" />
-          <div className="absolute inset-4 rounded border border-blue-400/20" />
-          <div className="text-6xl text-white/20 font-bold">♠</div>
-        </motion.div>
-      )}
-
-      {/* Card face content - starts hidden during entering, fades in at flip */}
-      <motion.div
-        className="absolute inset-0 flex flex-col items-center"
-        style={{ padding: '6px', zIndex: 10 }}
-        initial={{ opacity: animationState === 'entering' ? 0 : 1 }}
-        animate={{ opacity: 1 }}
-        transition={animationState === 'entering' ? {
-          delay: cardFlipTiming.faceFadeDelay,
-          duration: cardFlipTiming.faceFadeDuration
-        } : { duration: 0 }}
-      >
-        {/* Top-left rank and suit */}
-        <div className="absolute top-1 left-1.5 flex flex-col items-center leading-none">
-          <span className="text-base font-bold" style={{ color: suitColor }}>
-            {card.rank}
-          </span>
-          <span className="text-lg leading-none" style={{ color: suitColor }}>
-            {suitSymbol}
-          </span>
-        </div>
-
-        {/* Center suit symbol (large) */}
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-5xl leading-none" style={{ color: suitColor }}>
-            {suitSymbol}
-          </div>
-        </div>
-
-        {/* Bottom-right rank and suit (rotated) */}
-        <div className="absolute bottom-1 right-1.5 flex flex-col items-center leading-none rotate-180">
-          <span className="text-base font-bold" style={{ color: suitColor }}>
-            {card.rank}
-          </span>
-          <span className="text-lg leading-none" style={{ color: suitColor }}>
-            {suitSymbol}
-          </span>
-        </div>
-      </motion.div>
-
-      {/* Selection indicator overlay */}
-      {isSelected && (
-        <motion.div
-          className="absolute inset-0 rounded-xl bg-blue-100 opacity-20 pointer-events-none"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.2 }}
-          exit={{ opacity: 0 }}
-        />
-      )}
-
-      {/* Auto-play indicator overlay */}
-      {animationState === 'autoPlaying' && (() => {
-        const amberConfig = buildAmberOverlayConfig(timing.AUTO_PLAY_DELAY);
-        return (
-          <motion.div
-            className="absolute inset-0 rounded-xl bg-amber-100 pointer-events-none"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: amberConfig.opacity }}
-            exit={{ opacity: 0 }}
-            transition={amberConfig.transition}
-          />
-        );
-      })()}
-    </motion.button>
+          {faceDown ? (
+            // Render the detailed blue card back
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="absolute inset-2 rounded-lg border-2 border-blue-400/30" />
+              <div className="absolute inset-4 rounded border border-blue-400/20" />
+              <div className="text-6xl text-white/20 font-bold">♠</div>
+            </div>
+          ) : (
+            <>
+              {/* Card back design (shown when entering/face-down) */}
+              {animationState === 'entering' && (
+                <motion.div
+                  className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl"
+                  style={{ zIndex: 50 }}
+                  initial={{ opacity: 1 }}
+                  animate={{ opacity: 0 }}
+                  transition={{
+                    delay: cardFlipTiming.blueBackDelay,
+                    duration: cardFlipTiming.blueBackDuration,
+                  }}
+                >
+                  <div className="absolute inset-2 rounded-lg border-2 border-blue-400/30" />
+                  <div className="absolute inset-4 rounded border border-blue-400/20" />
+                  <div className="text-6xl text-white/20 font-bold">♠</div>
+                </motion.div>
+              )}
+    
+              {/* Card face content - starts hidden during entering, fades in at flip */}
+              <motion.div
+                className="absolute inset-0 flex flex-col items-center"
+                style={{ padding: '6px', zIndex: 10 }}
+                initial={{ opacity: animationState === 'entering' ? 0 : 1 }}
+                animate={{ opacity: 1 }}
+                transition={animationState === 'entering' ? {
+                  delay: cardFlipTiming.faceFadeDelay,
+                  duration: cardFlipTiming.faceFadeDuration
+                } : { duration: 0 }}
+              >
+                {/* Top-left rank and suit */}
+                <div className="absolute top-1 left-1.5 flex flex-col items-center leading-none">
+                  <span className="text-base font-bold" style={{ color: suitColor }}>
+                    {card.rank}
+                  </span>
+                  <span className="text-lg leading-none" style={{ color: suitColor }}>
+                    {suitSymbol}
+                  </span>
+                </div>
+    
+                {/* Center suit symbol (large) */}
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-5xl leading-none" style={{ color: suitColor }}>
+                    {suitSymbol}
+                  </div>
+                </div>
+    
+                {/* Bottom-right rank and suit (rotated) */}
+                <div className="absolute bottom-1 right-1.5 flex flex-col items-center leading-none rotate-180">
+                  <span className="text-base font-bold" style={{ color: suitColor }}>
+                    {card.rank}
+                  </span>
+                  <span className="text-lg leading-none" style={{ color: suitColor }}>
+                    {suitSymbol}
+                  </span>
+                </div>
+              </motion.div>
+    
+              {/* Selection indicator overlay */}
+              {isSelected && (
+                <motion.div
+                  className="absolute inset-0 rounded-xl bg-blue-100 opacity-20 pointer-events-none"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 0.2 }}
+                  exit={{ opacity: 0 }}
+                />
+              )}
+    
+              {/* Auto-play indicator overlay */}
+              {animationState === 'autoPlaying' && (() => {
+                const amberConfig = buildAmberOverlayConfig(timing.AUTO_PLAY_DELAY);
+                return (
+                  <motion.div
+                    className="absolute inset-0 rounded-xl bg-amber-100 pointer-events-none"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: amberConfig.opacity }}
+                    exit={{ opacity: 0 }}
+                    transition={amberConfig.transition}
+                  />
+                );
+              })()}
+            </>
+          )}
+        </motion.button>
+    
   );
 }

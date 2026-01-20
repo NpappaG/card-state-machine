@@ -4,11 +4,12 @@ A state machine architecture for a turn-based card game system using XState v5.
 
 ## Overview
 
-This project implements a turn-based card matching game where 2-4 players race to empty their hands (or finish with the lowest score) before a 3-minute timer expires.
+This project implements a turn-based card matching game where 2-4 players compete to match cards by rank to a discard pile. The goal is to be the first to discard all cards or to finish with the lowest hand value when the round timer expires.
 
 ## Game Mechanics
 
-Achieve the lowest total hand value or dispose of all your cards before the 3-minute round timer expires.
+*   **Objective**: Be the first to discard all your cards, or have the lowest total hand value when the 3-minute round timer expires.
+*   **Card Play**: Match cards by rank to the top card of the shared discard pile. If you cannot play a match, you must take another card from the deck.
 
 ### Scoring System
 
@@ -191,7 +192,7 @@ This separates decision logic from animation timing, following the principle tha
 
 **External Events:**
 - `game.start` - User starts a new game
-- `game.newRound` - User starts a new round (keeps players, resets deck)
+- `round.start` - User starts a new round (keeps players, resets deck)
 - `game.over` - User ends game, returns to setup
 - `card.select`, `card.deselect` - User selects/deselects cards
 - `card.play` - User plays selected cards (SPACE key)
@@ -220,7 +221,7 @@ This separates decision logic from animation timing, following the principle tha
 - `drawing` --after `DRAW_DELAY`--> `evaluating`
 - `evaluating` --`currentPlayerHasNoCards`--> `roundEnd`
 - `evaluating` --else--> `changingTurn`
-- `roundEnd` --`game.newRound`--> `roundActive` (same players)
+- `roundEnd` --`round.start`--> `roundActive` (same players)
 - `roundEnd` --`game.over`--> `setup` (full reset)
 - `changingTurn` --after `TURN_CHANGE_DELAY / advanceTurn`--> `checkingCards`
 - `roundActive` --`timer.expired`--> `roundEnd`

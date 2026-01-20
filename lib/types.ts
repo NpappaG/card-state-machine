@@ -61,5 +61,6 @@ export type GameEvent =
   | { type: 'timer.expired' }
   | { type: 'round.pause'; timestamp: number }
   | { type: 'round.resume'; timestamp: number }
-  | { type: 'game.newRound'; timestamp: number }
-  | { type: 'game.over' };
+  | { type: 'round.start'; timestamp: number }
+  | { type: 'game.over' }
+  | { type: 'timing.update'; timing: GameContext['timing'] };
