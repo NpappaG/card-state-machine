@@ -49,10 +49,6 @@ export function StateTreeVisualizer({ game }: StateTreeVisualizerProps) {
 
   const handScore = calculateHandScore(game.currentPlayer);
 
-  const isInState = (statePath: any) => {
-    return game.snapshot.matches(statePath);
-  };
-
   return (
     <div>
       {isCollapsed ? (
@@ -90,46 +86,46 @@ export function StateTreeVisualizer({ game }: StateTreeVisualizerProps) {
           </div>
 
           <div className="flex flex-col gap-0.5">
-            <StateNode name="setup" isActive={isInState('setup')} />
+            <StateNode name="setup" isActive={game.isSetup} />
 
-            <StateNode name="roundActive" isActive={isInState('roundActive')} />
+            <StateNode name="roundActive" isActive={game.isRoundActive} />
             <StateNode
               name="  playerTurn"
-              isActive={isInState('roundActive.playing.playerTurn')}
+              isActive={game.isPlaying || game.isPaused}
               level={1}
             />
             <StateNode
               name="    checkingCards"
-              isActive={isInState('roundActive.playing.playerTurn.checkingCards')}
+              isActive={game.isCheckingCards}
               level={2}
             />
             <StateNode
               name="    selecting"
-              isActive={isInState('roundActive.playing.playerTurn.selecting')}
+              isActive={game.isSelecting}
               level={2}
             />
             <StateNode
               name="    autoPlaying"
-              isActive={isInState('roundActive.playing.playerTurn.autoPlaying')}
+              isActive={game.isAutoPlaying}
               level={2}
             />
             <StateNode
               name="    drawing"
-              isActive={isInState('roundActive.playing.playerTurn.drawing')}
+              isActive={game.isDrawing}
               level={2}
             />
             <StateNode
               name="    evaluating"
-              isActive={isInState('roundActive.playing.playerTurn.evaluating')}
+              isActive={game.isEvaluating}
               level={2}
             />
             <StateNode
               name="    changingTurn"
-              isActive={isInState('roundActive.playing.playerTurn.changingTurn')}
+              isActive={game.isChangingTurn}
               level={2}
             />
 
-            <StateNode name="roundEnd" isActive={isInState('roundEnd')} />
+            <StateNode name="roundEnd" isActive={game.isRoundEnd} />
           </div>
 
           <div className="mt-2 pt-2 border-t border-white/10">

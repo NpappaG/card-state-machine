@@ -212,9 +212,15 @@ Xstate gives you a ton (and sometime frustrating amount) of flexibility on model
 
 ### 3. Dedicated Timer Actor
 
-**Problem:** Timer logic and game logic are separate concerns. While easily done in a monoloth, mixing them in the same machine ultimatley felt cluttered.
+**Problem:** Timer logic and game logic are separate concerns. While easily done in a monolith, mixing them in the same machine ultimately felt cluttered.
 
 **Solution:** Separated into `timerMachine` and `gameMachine` and while I was at it I added pause/play. The main game machine invokes this actor and only listens for a single `timer.expired` event. All timer-related state (remaining time, pause state) is owned exclusively by the timer actor.
+
+The timer uses XState v5's `invoke` pattern which couples its lifecycle to the `roundActive` state - it's created on entry, destroyed on exit, no cleanup needed. The parent passes its own reference via `input: ({ self }) => ({ parentRef: self, ... })` so the timer can use `sendTo` instead of the deprecated `sendParent` pattern.
+
+The `syncSnapshot: true` flag is critical - without it, the timer ticks internally but the parent snapshot stays frozen, so React's `useSelector` never fires and the UI doesn't update. With it, every tick creates a new parent snapshot and React re-renders.
+
+Pause/resume uses history states, which restore the state path but restart `after` delays from scratch. For short game animations (200-1000ms), this is acceptable.
 
 ## Tech Stack
 

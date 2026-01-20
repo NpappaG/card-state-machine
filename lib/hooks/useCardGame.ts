@@ -2,9 +2,12 @@
 
 import { useMachine, useSelector } from '@xstate/react';
 import { useEffect } from 'react';
+import type { ActorRefFrom } from 'xstate';
 import { cardGameMachine } from '@/machines/cardGameMachine';
+import { timerMachine } from '@/machines/timerMachine';
 import { useTiming } from '@/lib/contexts/TimingContext';
-import { getTimerRemainingMs } from '@/lib/timerHelpers';
+
+type TimerActor = ActorRefFrom<typeof timerMachine>;
 
 /**
  * Primary React hook for accessing card game state machine.
@@ -51,11 +54,20 @@ export function useCardGame() {
   const roundDurationMs = snapshot.context.timing.ROUND_DURATION_MS;
 
   // Timer state comes from timer actor, not context
-  // Use useSelector to subscribe to timer updates so React re-renders when timer ticks
-  const timerRemainingMs = useSelector(actor, (state) => {
-    const timerActor = state.children.timer;
-    return getTimerRemainingMs(timerActor);
-  });
+  // Subscribe directly to timer actor for immediate updates every second
+  // Timer only exists during roundActive state, so we guard access
+  const timerActor = snapshot.children.timer as TimerActor | undefined;
+  const timerFromActor = useSelector(
+    timerActor ?? actor, // Fallback to main actor when timer not active
+    (state) => {
+      // Only read remainingMs if it exists in context (timer actor)
+      if (timerActor && 'remainingMs' in state.context) {
+        return state.context.remainingMs ?? roundDurationMs;
+      }
+      return roundDurationMs;
+    }
+  );
+  const timerRemainingMs = snapshot.matches('roundActive') ? timerFromActor : roundDurationMs;
   const timerPercent = (timerRemainingMs / roundDurationMs) * 100;
 
   const isSetupState = snapshot.matches('setup');
